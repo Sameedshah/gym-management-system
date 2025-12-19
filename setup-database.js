@@ -3,7 +3,6 @@ const fs = require('fs')
 const path = require('path')
 
 // Load environment variables manually
-const fs = require('fs')
 const envContent = fs.readFileSync('.env.local', 'utf8')
 const envVars = {}
 envContent.split('\n').forEach(line => {

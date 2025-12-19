@@ -150,7 +150,6 @@ export async function POST(request: NextRequest) {
         // Don't fail the main request, just log the error
       }
     }
-
     return NextResponse.json({
       success: true,
       message: 'Biometric settings saved successfully'
