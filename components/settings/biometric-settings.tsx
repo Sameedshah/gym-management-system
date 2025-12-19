@@ -189,7 +189,16 @@ export function BiometricSettings() {
 
         {/* Device Configuration */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Device Configuration</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Device Configuration</h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.open('/api/docs/setup-guide', '_blank')}
+            >
+              📖 Setup Guide
+            </Button>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

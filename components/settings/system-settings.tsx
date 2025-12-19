@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useClerk } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Settings, Save, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export function SystemSettings() {
   const [settings, setSettings] = useState({
@@ -23,11 +24,44 @@ export function SystemSettings() {
   const { signOut } = useClerk()
   const router = useRouter()
 
+  // Load settings on component mount
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/system')
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(data.settings || settings)
+      }
+    } catch (error) {
+      console.error('Failed to load system settings:', error)
+    }
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
-    // Simulate saving settings
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
+    try {
+      const response = await fetch('/api/settings/system', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        toast.success('System settings saved successfully')
+      } else {
+        toast.error(result.error || 'Failed to save settings')
+      }
+    } catch (error) {
+      toast.error('Failed to save system settings')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleLogout = async () => {
