@@ -11,7 +11,13 @@ export async function GET() {
     }
 
     // Call the sync attendance API
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+    let baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+    
+    // Ensure baseUrl has proper protocol
+    if (baseUrl && !baseUrl.startsWith('http')) {
+      baseUrl = `https://${baseUrl}`
+    }
+    
     const response = await fetch(`${baseUrl}/api/biometric/sync-attendance`, {
       method: 'POST',
       headers: {

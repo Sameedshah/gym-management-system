@@ -79,7 +79,7 @@ export async function POST(req: Request) {
           first_name: first_name || '',
           last_name: last_name || '',
           avatar_url: image_url || '',
-          role: 'owner', // First user is owner
+          role: 'admin', // First user is admin
           is_active: true
         })
 
@@ -91,54 +91,14 @@ export async function POST(req: Request) {
       console.log('✅ User created successfully:', id)
     }
 
-    // Handle organization.created event
+    // Handle organization.created event (skip - no organizations table)
     if (eventType === 'organization.created') {
-      const { id, name, slug, created_by } = evt.data
-      console.log(`🏢 Creating organization: ${name} (${id})`)
-
-      // Insert organization into database
-      const { error } = await supabase
-        .from('organizations')
-        .insert({
-          clerk_org_id: id,
-          name: name,
-          slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-          owner_clerk_id: created_by,
-          license_type: 'standard',
-          license_status: 'active',
-          is_active: true,
-          onboarding_completed: false
-        })
-
-      if (error) {
-        console.error('❌ Error creating organization:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      console.log('✅ Organization created successfully:', id)
+      console.log('✅ Organization event ignored (no organizations table)')
     }
 
-    // Handle organizationMembership.created event
+    // Handle organizationMembership.created event (skip - no organizations table)
     if (eventType === 'organizationMembership.created') {
-      const { organization, public_user_data } = evt.data
-
-      // Update user's organization_id
-      const { error } = await supabase
-        .from('users')
-        .update({
-          organization_id: (await supabase
-            .from('organizations')
-            .select('id')
-            .eq('clerk_org_id', organization.id)
-            .single()).data?.id
-        })
-        .eq('clerk_user_id', public_user_data.user_id)
-
-      if (error) {
-        console.error('Error updating user organization:', error)
-      }
-
-      console.log('User added to organization:', public_user_data.user_id)
+      console.log('✅ Organization membership event ignored (no organizations table)')
     }
 
     // Handle user.updated event
@@ -163,24 +123,9 @@ export async function POST(req: Request) {
       console.log('User updated:', id)
     }
 
-    // Handle organization.updated event
+    // Handle organization.updated event (skip - no organizations table)
     if (eventType === 'organization.updated') {
-      const { id, name, slug } = evt.data
-
-      const { error } = await supabase
-        .from('organizations')
-        .update({
-          name: name,
-          slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('clerk_org_id', id)
-
-      if (error) {
-        console.error('Error updating organization:', error)
-      }
-
-      console.log('Organization updated:', id)
+      console.log('✅ Organization update event ignored (no organizations table)')
     }
 
     console.log('✅ Webhook processed successfully')
