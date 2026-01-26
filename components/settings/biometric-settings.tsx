@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Fingerprint, Wifi, WifiOff, Save, TestTube, RefreshCw, Users, Clock } from "lucide-react"
+import { Fingerprint, Wifi, WifiOff, Save, TestTube, RefreshCw, Users, Clock, Zap } from "lucide-react"
 import { toast } from "sonner"
 
 interface BiometricSettings {
