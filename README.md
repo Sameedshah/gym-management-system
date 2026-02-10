@@ -19,9 +19,10 @@ This is a **multi-tenant SaaS platform** designed for reselling to gym owners. E
 - 💳 **Payment Tracking**: Invoice generation and payment monitoring
 - 📊 **Real-time Dashboard**: Live statistics and attendance
 - 👆 **Biometric Integration**: Universal fingerprint scanner support (Hikvision, ZKTeco, Suprema, etc.)
+- ⚡ **Real-time Attendance**: Instant updates via ISAPI event stream (1-2 second delay)
 - 📱 **Responsive Design**: Works on all devices
 - 🌙 **Dark Mode**: Built-in theme support
-- ⚡ **Real-time Updates**: Live data synchronization
+- 🔄 **Auto-sync**: Background listener for 24/7 attendance tracking
 - 👥 **Staff Management**: Role-based access control
 
 ### For Resellers
@@ -39,7 +40,9 @@ This is a **multi-tenant SaaS platform** designed for reselling to gym owners. E
 - **Authentication**: Clerk (Multi-tenant SSO)
 - **Database**: Supabase (PostgreSQL with RLS)
 - **Styling**: Tailwind CSS, Radix UI
-- **Biometric**: Universal device support (ISAPI, SDK, REST API)
+- **Biometric**: Universal device support (ISAPI event stream, SDK, REST API)
+- **Real-time**: Supabase Realtime + ISAPI event stream
+- **Background Service**: Node.js listener for biometric events
 - **Deployment**: Vercel (recommended)
 - **Monitoring**: Built-in activity logs and audit trails
 
@@ -85,6 +88,67 @@ git push origin main
 ```
 
 **📚 Detailed Guide**: See [QUICK_START.md](QUICK_START.md)
+
+## 🔔 Biometric Integration (Real-time)
+
+This system supports **enterprise-grade real-time attendance** using ISAPI event stream.
+
+### Quick Setup
+
+1. **Navigate to listener folder**:
+   ```bash
+   cd biometric-listener
+   npm install
+   ```
+
+2. **Configure device** (edit `.env`):
+   ```env
+   DEVICE_IP=192.168.1.64
+   DEVICE_USERNAME=admin
+   DEVICE_PASSWORD=@Smgym7?
+   SUPABASE_SERVICE_KEY=your_service_role_key
+   ```
+
+3. **Test connection**:
+   ```bash
+   npm test
+   ```
+
+4. **Start listener**:
+   ```bash
+   npm start
+   ```
+
+5. **Auto-start on Windows boot** (optional):
+   ```bash
+   npm run install-service
+   ```
+
+### How It Works
+
+```
+Fingerprint Scan → ISAPI Event Stream → Node.js Listener → Supabase → Dashboard
+     (instant)        (1-2 seconds)        (your PC)        (cloud)    (real-time)
+```
+
+**Features:**
+- ⚡ Real-time updates (1-2 second delay)
+- 🔄 Auto-reconnect on connection loss
+- 🛡️ Duplicate prevention
+- 📊 Live dashboard updates
+- 🔔 Browser notifications
+- 🚀 Enterprise-grade architecture
+
+**Documentation:**
+- 📖 [Complete Setup Guide](docs/COMPLETE_HIKVISION_SETUP_GUIDE.md)
+- ⚡ [ISAPI Event Stream Guide](docs/ISAPI_EVENT_STREAM_GUIDE.md)
+- 🚀 [Quick Setup](biometric-listener/QUICK_SETUP.md)
+- 🔧 [Troubleshooting](docs/TROUBLESHOOTING_FLOWCHART.md)
+
+**Supported Devices:**
+- Hikvision fingerprint terminals (DS-K1T8xx series)
+- Any device with ISAPI event notification support
+- No web UI required!
 
 ## Production Deployment
 
