@@ -262,6 +262,113 @@ export function BiometricSettings() {
 
         <Separator />
 
+        {/* Setup Guides Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Setup & Configuration Guides</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">1</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm">Complete Setup Guide</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Full installation from unboxing to real-time webhooks
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2 h-7 text-xs"
+                    onClick={() => window.open('/api/docs/complete-setup-guide', '_blank')}
+                  >
+                    📖 Full Guide
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 font-bold text-sm">2</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm">ISAPI Configuration</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Device API setup and user management
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2 h-7 text-xs"
+                    onClick={() => window.open('/api/docs/setup-guide', '_blank')}
+                  >
+                    🔧 ISAPI Guide
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 font-bold text-sm">3</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm">Real-time Webhooks</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Configure instant push notifications
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2 h-7 text-xs"
+                    onClick={() => window.open('/api/docs/realtime-setup-guide', '_blank')}
+                  >
+                    ⚡ Webhook Guide
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Real-time Webhook Configuration */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Real-time Push Configuration</h3>
+          
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start gap-3">
+              <Zap className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-medium text-blue-900">Enterprise Real-time Updates</h4>
+                <p className="text-sm text-blue-700 mt-1">
+                  Configure your device to push attendance instantly instead of polling every few minutes.
+                </p>
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs">
+                    <span className="font-medium">Webhook URL:</span>
+                    <code className="ml-2 px-2 py-1 bg-blue-100 rounded text-blue-800 text-xs">
+                      {typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/api/webhooks/hikvision
+                    </code>
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    ✅ No cron jobs needed • ✅ Instant updates • ✅ Works on free hosting
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Sync Settings */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Sync Settings</h3>
