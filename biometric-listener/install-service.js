@@ -1,10 +1,11 @@
-const Service = require('node-windows').Service
+const Service = require('node-windows').Service;
+const path = require('path');
 
 // Create a new service object
 const svc = new Service({
-  name: 'Hikvision Biometric Listener',
-  description: 'Real-time biometric attendance event listener for Hikvision devices',
-  script: require('path').join(__dirname, 'index.js'),
+  name: 'ZKTeco Biometric Listener',
+  description: 'Real-time attendance monitoring for ZKTeco K40 biometric device',
+  script: path.join(__dirname, 'index.js'),
   nodeOptions: [
     '--harmony',
     '--max_old_space_size=4096'
@@ -15,34 +16,53 @@ const svc = new Service({
       value: 'production'
     }
   ]
-})
+});
 
 // Listen for the "install" event
-svc.on('install', () => {
-  console.log('✅ Service installed successfully!')
-  console.log('🚀 Starting service...')
-  svc.start()
-})
+svc.on('install', function() {
+  console.log('✅ Service installed successfully!');
+  console.log('');
+  console.log('Starting service...');
+  svc.start();
+});
 
-svc.on('start', () => {
-  console.log('✅ Service started successfully!')
-  console.log('📋 Service Name: Hikvision Biometric Listener')
-  console.log('🔧 You can manage it from Windows Services (services.msc)')
-  console.log('')
-  console.log('Service will now auto-start when Windows boots!')
-})
+// Listen for the "start" event
+svc.on('start', function() {
+  console.log('✅ Service started successfully!');
+  console.log('');
+  console.log('Service Details:');
+  console.log(`  Name: ${svc.name}`);
+  console.log(`  Description: ${svc.description}`);
+  console.log('');
+  console.log('The service will now run automatically on Windows startup.');
+  console.log('');
+  console.log('To manage the service:');
+  console.log('  1. Open Services (services.msc)');
+  console.log('  2. Find "ZKTeco Biometric Listener"');
+  console.log('  3. Right-click to Start/Stop/Restart');
+  console.log('');
+  console.log('To uninstall: npm run uninstall-service');
+  console.log('');
+});
 
-svc.on('alreadyinstalled', () => {
-  console.log('⚠️ Service is already installed')
-  console.log('💡 Run "npm run uninstall-service" first to reinstall')
-})
+// Listen for errors
+svc.on('error', function(err) {
+  console.error('❌ Service installation failed:');
+  console.error(err.message);
+  console.error('');
+  console.error('Make sure you are running this as Administrator!');
+  console.error('Right-click Command Prompt and select "Run as Administrator"');
+  process.exit(1);
+});
 
-svc.on('error', (err) => {
-  console.error('❌ Service error:', err)
-})
+console.log('='.repeat(60));
+console.log('Installing ZKTeco Biometric Listener as Windows Service');
+console.log('='.repeat(60));
+console.log('');
+console.log('⚠️  IMPORTANT: You must run this as Administrator!');
+console.log('');
+console.log('Installing...');
+console.log('');
 
 // Install the service
-console.log('📦 Installing Windows Service...')
-console.log('⚠️ This requires Administrator privileges')
-console.log('')
-svc.install()
+svc.install();

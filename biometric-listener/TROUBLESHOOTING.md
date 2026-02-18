@@ -1,570 +1,656 @@
-# Troubleshooting Guide
+# ZKTeco K40 Troubleshooting Guide
 
-Quick reference for common issues and solutions.
+Common issues and solutions for ZKTeco K40 biometric attendance system.
 
-## 🔍 Quick Diagnostics
+## 🔍 Diagnostic Tools
 
-### Run Connection Test
+### Quick Health Check
+
 ```bash
-cd biometric-listener
+# Test device connection
 npm test
+
+# Start with debug logging
+# Edit .env: LOG_LEVEL=debug
+npm start
 ```
 
-This will check:
-- ✅ Network connectivity
-- ✅ Device authentication
-- ✅ Event stream support
-- ✅ Device information
+### Network Test
 
-## 🚨 Common Issues
+```bash
+# Test device reachability
+ping 192.168.1.201
 
-### 1. Can't Connect to Device
+# Test port (Windows)
+Test-NetConnection -ComputerName 192.168.1.201 -Port 4370
+```
+
+## ❌ Connection Issues
+
+### Error: "Connection failed: connect ETIMEDOUT"
 
 **Symptoms:**
-```
-❌ Connection failed: connect ETIMEDOUT
-❌ Connection failed: connect ECONNREFUSED
-```
+- Can't connect to device
+- Timeout errors
+- Connection hangs
 
-**Diagnostic Steps:**
+**Solutions:**
 
-1. **Test network connectivity:**
+1. **Verify device IP:**
    ```bash
-   ping 192.168.1.64
+   ping 192.168.1.201
    ```
-   - ✅ Getting replies? Network is good
-   - ❌ Request timeout? Network issue
+   - If no reply, check device IP address
+   - Check device is on same network
+   - Verify IP in `.env` matches device
 
 2. **Check device power:**
-   - Is power LED on?
-   - Is network LED blinking?
-   - Try power cycle (unplug, wait 10s, plug back)
+   - Ensure device is powered on
+   - Check LED indicators are lit
+   - Try power cycling device
 
-3. **Verify IP address:**
-   ```bash
-   # Check your computer's IP
-   ipconfig
-   
-   # Should be same subnet (e.g., 192.168.1.x)
-   ```
+3. **Check network cable:**
+   - Verify Ethernet cable is connected
+   - Try different cable
+   - Check cable is not damaged
+   - Try different network port on router
 
 4. **Check firewall:**
    ```bash
-   # Windows: Temporarily disable firewall
-   # Test if connection works
-   # If yes, add exception for Node.js
+   # Windows Firewall
+   # Allow Node.js through firewall
+   # Or temporarily disable to test
    ```
 
-5. **Try different port:**
-   - Edit `.env`: `DEVICE_PORT=8080`
-   - Some devices use port 8080 instead of 80
+5. **Verify port:**
+   - Default ZKTeco port is `4370`
+   - Check device settings
+   - Verify `.env` has correct port
+
+### Error: "Authentication failed"
+
+**Symptoms:**
+- Connection established but auth fails
+- 401 or authentication errors
 
 **Solutions:**
-- Ensure device and PC on same network
-- Check network cable connections
-- Verify device IP hasn't changed
-- Disable firewall temporarily to test
-- Try accessing device in browser: `http://192.168.1.64`
 
----
+1. **Check device password:**
+   - Default is `0`
+   - Verify password in `.env`
+   - Try device default: `0` or `1234`
 
-### 2. Authentication Failed (401)
+2. **Reset device password:**
+   - Access device menu
+   - System → Password
+   - Reset to default
+
+3. **Check device settings:**
+   - Ensure TCP/IP is enabled
+   - Verify communication settings
+   - Check device is not locked
+
+### Error: "Socket hang up" or "ECONNRESET"
 
 **Symptoms:**
-```
-❌ Connection failed: Request failed with status code 401
-❌ Authentication failed
-```
-
-**Diagnostic Steps:**
-
-1. **Verify credentials in `.env`:**
-   ```env
-   DEVICE_USERNAME=admin
-   DEVICE_PASSWORD=@Smgym7?
-   ```
-
-2. **Check for special characters:**
-   - Password has special chars? Ensure no typos
-   - Try wrapping in quotes: `DEVICE_PASSWORD="@Smgym7?"`
-
-3. **Try default credentials:**
-   ```env
-   DEVICE_USERNAME=admin
-   DEVICE_PASSWORD=12345
-   ```
-
-4. **Check device label:**
-   - Look for sticker on device
-   - May have default password printed
+- Connection drops randomly
+- Socket errors
+- Intermittent connectivity
 
 **Solutions:**
-- Verify username/password are correct
-- Try default credentials (admin/12345)
-- Reset device to factory defaults
-- Check device documentation for default password
-- Contact device administrator
-
----
-
-### 3. Connected But No Events
-
-**Symptoms:**
-```
-✅ Connected to device event stream
-👂 Listening for biometric events...
-(nothing happens when scanning)
-```
-
-**Diagnostic Steps:**
-
-1. **Enable debug mode:**
-   ```env
-   # In .env file
-   LOG_LEVEL=debug
-   ```
-   Restart listener and check for detailed logs
-
-2. **Verify fingerprint enrollment:**
-   - Is fingerprint enrolled in device?
-   - Does employee have employee number set?
-   - Try enrolling test fingerprint
-
-3. **Check employee number:**
-   - Device shows employee number when scanning?
-   - Note the number shown
-
-4. **Test with multiple scans:**
-   - Try scanning 3-5 times
-   - Try different fingers
-   - Try different enrolled users
-
-5. **Check device event settings:**
-   - If device has UI, check event settings
-   - Ensure access control events are enabled
-
-**Solutions:**
-- Enroll fingerprint with employee number
-- Verify employee number is set correctly
-- Enable debug logging to see raw events
-- Check device event configuration
-- Try different enrolled user
-
----
-
-### 4. Member Not Found
-
-**Symptoms:**
-```
-🔔 Event received: AccessControl | Employee: 1001
-⚠️ Member not found for employee number: 1001
-```
-
-**Diagnostic Steps:**
-
-1. **Check database for member:**
-   - Go to Supabase Dashboard
-   - Open `members` table
-   - Search for `member_id = "1001"`
-
-2. **Verify member_id field:**
-   ```sql
-   SELECT id, name, member_id 
-   FROM members 
-   WHERE member_id = '1001'
-   ```
-
-3. **Check employee number on device:**
-   - What number is shown when scanning?
-   - Does it match `member_id` in database?
-
-**Solutions:**
-- Create member in dashboard with matching `member_id`
-- Update existing member's `member_id` to match device
-- Ensure employee number on device matches database
-- Check for leading zeros (e.g., "0001" vs "1001")
-
-**Example Fix:**
-```sql
--- Update member's member_id to match device
-UPDATE members 
-SET member_id = '1001' 
-WHERE name = 'John Doe'
-```
-
----
-
-### 5. Database Connection Failed
-
-**Symptoms:**
-```
-❌ Error saving attendance: Invalid API key
-❌ Error saving attendance: Failed to fetch
-```
-
-**Diagnostic Steps:**
-
-1. **Verify Supabase URL:**
-   ```env
-   SUPABASE_URL=https://rhnerzynwcmwzorumqdq.supabase.co
-   ```
-
-2. **Check service role key:**
-   - Go to Supabase Dashboard
-   - Settings → API
-   - Copy **service_role** key (NOT anon key!)
-   - Paste in `.env`:
-     ```env
-     SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-     ```
-
-3. **Test Supabase connection:**
-   ```bash
-   # Try accessing Supabase in browser
-   https://rhnerzynwcmwzorumqdq.supabase.co
-   ```
-
-4. **Check internet connection:**
-   ```bash
-   ping supabase.co
-   ```
-
-**Solutions:**
-- Verify `SUPABASE_URL` is correct
-- Use service_role key, not anon key
-- Check internet connection
-- Verify Supabase project is active
-- Check for typos in `.env` file
-
----
-
-### 6. Duplicate Check-ins
-
-**Symptoms:**
-```
-✅ Check-in recorded for John Doe
-✅ Check-in recorded for John Doe (again, within 1 minute)
-```
-
-**This is actually PREVENTED by the system!**
-
-The listener has built-in duplicate prevention:
-- Checks for existing check-ins within 1-minute window
-- Skips duplicate events automatically
-- Logs: "⏭️ Duplicate check-in prevented"
-
-**If you're seeing duplicates:**
-1. Check logs for "Duplicate prevented" messages
-2. Verify duplicate prevention is working
-3. Check if events are coming from different devices
-4. Ensure only one listener is running
-
----
-
-### 7. Service Won't Start
-
-**Symptoms:**
-```
-❌ Service failed to start
-❌ Error 1053: The service did not respond
-```
-
-**Diagnostic Steps:**
-
-1. **Check if already running:**
-   ```bash
-   # Open Services (services.msc)
-   # Look for "Hikvision Biometric Listener"
-   # If running, stop it first
-   ```
-
-2. **Test manual start:**
-   ```bash
-   npm start
-   # If this works, service installation issue
-   ```
-
-3. **Check Node.js path:**
-   ```bash
-   where node
-   # Should show: C:\Program Files\nodejs\node.exe
-   ```
-
-4. **Run as Administrator:**
-   - Right-click Command Prompt
-   - "Run as Administrator"
-   - Try install again
-
-**Solutions:**
-- Stop existing service before reinstalling
-- Ensure Node.js is in system PATH
-- Run installation as Administrator
-- Check Event Viewer for detailed errors
-- Try uninstall then reinstall
-
----
-
-### 8. High CPU/Memory Usage
-
-**Symptoms:**
-```
-Listener using 50%+ CPU
-Memory usage growing over time
-```
-
-**Diagnostic Steps:**
-
-1. **Check for connection loops:**
-   - Look for repeated connection attempts
-   - Check for rapid reconnection
-
-2. **Enable debug logging:**
-   ```env
-   LOG_LEVEL=debug
-   ```
-   Look for unusual patterns
-
-3. **Check event frequency:**
-   - Are events coming too frequently?
-   - Is device sending duplicate events?
-
-**Solutions:**
-- Increase reconnect delay in `.env`:
-  ```env
-  RECONNECT_DELAY=10000  # 10 seconds
-  ```
-- Restart listener
-- Check device for issues
-- Update Node.js to latest LTS
-- Check for memory leaks in logs
-
----
-
-### 9. Dashboard Not Updating
-
-**Symptoms:**
-```
-✅ Check-in recorded for John Doe
-(but dashboard doesn't show it)
-```
-
-**Diagnostic Steps:**
-
-1. **Check dashboard connection:**
-   - Look for ⚡ lightning bolt icon
-   - Should be visible on dashboard
-
-2. **Check browser console:**
-   - Press F12
-   - Look for errors in Console tab
-   - Look for WebSocket connection
-
-3. **Verify Supabase realtime:**
-   - Go to Supabase Dashboard
-   - Database → Replication
-   - Ensure realtime is enabled for `checkins` table
-
-4. **Test manual refresh:**
-   - Refresh browser (F5)
-   - Does check-in appear now?
-
-**Solutions:**
-- Enable Supabase realtime for `checkins` table
-- Check browser console for errors
-- Verify WebSocket connection
-- Try different browser
-- Clear browser cache
-
----
-
-### 10. Listener Keeps Disconnecting
-
-**Symptoms:**
-```
-✅ Connected to device event stream
-⚠️ Event stream ended
-🔄 Reconnecting in 5 seconds...
-(repeats frequently)
-```
-
-**Diagnostic Steps:**
 
 1. **Check network stability:**
-   ```bash
-   ping 192.168.1.64 -t
-   # Watch for packet loss or high latency
+   - Test continuous ping: `ping -t 192.168.1.201`
+   - Look for packet loss
+   - Check for network congestion
+
+2. **Increase timeout:**
+   Edit `.env`:
+   ```env
+   DEVICE_TIMEOUT=10000  # 10 seconds
    ```
 
-2. **Check device logs:**
-   - If device has UI, check system logs
-   - Look for connection errors
+3. **Check device load:**
+   - Device may be overloaded
+   - Reduce polling frequency
+   - Check device storage
 
-3. **Verify device isn't rebooting:**
-   - Check device uptime
-   - Look for power issues
+4. **Restart device:**
+   - Power cycle device
+   - Wait 60 seconds
+   - Restart listener
 
-4. **Check for network congestion:**
-   - Are other devices having issues?
-   - Is network overloaded?
+## 👤 Member/User Issues
+
+### Error: "Member not found for device user ID: 1001"
+
+**Symptoms:**
+- Fingerprint scan works on device
+- Listener receives log
+- No database record created
+- Error in logs
 
 **Solutions:**
-- Use wired Ethernet (not WiFi)
-- Check network cable quality
-- Verify device power supply
-- Increase reconnect delay
-- Check for network interference
-- Update device firmware
 
----
+1. **Verify member exists:**
+   ```sql
+   SELECT * FROM members WHERE member_id = '1001';
+   ```
+   - Should return one row
+   - If empty, member doesn't exist
 
-## 🔧 Advanced Diagnostics
+2. **Check member_id format:**
+   - Must be string: `"1001"` not `1001`
+   - Must match exactly (case-sensitive)
+   - No extra spaces or characters
 
-### Check Listener Status
-```bash
-# If running as service
-services.msc
-# Find "Hikvision Biometric Listener"
-# Check status and startup type
+3. **Update member_id:**
+   ```sql
+   UPDATE members
+   SET member_id = '1001'
+   WHERE email = 'john@example.com';
+   ```
 
-# If running manually
-# Check if process is running
-tasklist | findstr node
-```
+4. **Check device user ID:**
+   ```bash
+   npm test
+   # Look for enrolled users and their IDs
+   ```
 
-### View Detailed Logs
-```bash
-# Manual mode
-npm start
-# Logs appear in console
+5. **Verify Supabase connection:**
+   - Check `SUPABASE_URL` is correct
+   - Verify `SUPABASE_SERVICE_KEY` is valid
+   - Test database connection
 
-# Service mode
-eventvwr.msc
-# Windows Logs → Application
-# Look for "Hikvision Biometric Listener"
-```
+### Error: "Duplicate attendance record"
 
-### Test Individual Components
+**Symptoms:**
+- Multiple records for same scan
+- Records within 1 minute of each other
 
-**1. Test Device Connectivity:**
-```bash
-ping 192.168.1.64
-telnet 192.168.1.64 80
-```
+**Solutions:**
 
-**2. Test Device Authentication:**
-```bash
-npm test
-```
+1. **Check duplicate prevention:**
+   - System prevents duplicates within 1 minute
+   - This is normal behavior
+   - If seeing duplicates, check logs
 
-**3. Test Database Connection:**
-```bash
-# In Node.js console
-const { createClient } = require('@supabase/supabase-js')
-const supabase = createClient(
-  'https://rhnerzynwcmwzorumqdq.supabase.co',
-  'your_service_role_key'
-)
-const { data, error } = await supabase.from('members').select('*').limit(1)
-console.log(data, error)
-```
+2. **Verify device time:**
+   - Device time must be accurate
+   - Check device: System → Date/Time
+   - Sync with NTP if available
 
-**4. Test Event Stream:**
-```bash
-# Use curl or Postman
-curl -u admin:@Smgym7? http://192.168.1.64/ISAPI/Event/notification/alertStream
-```
+3. **Check listener instances:**
+   - Ensure only one listener is running
+   - Stop duplicate services
+   - Check Task Manager for multiple node processes
 
----
+## 📊 Attendance Log Issues
+
+### Problem: No attendance logs received
+
+**Symptoms:**
+- Listener connected
+- Fingerprint scan works on device
+- No logs in listener console
+- No database records
+
+**Solutions:**
+
+1. **Verify fingerprint enrollment:**
+   - Check user is enrolled on device
+   - Test fingerprint recognition
+   - Re-enroll if needed
+
+2. **Check device user ID:**
+   - User must have ID assigned
+   - Check device: User → View User
+   - Verify ID is set
+
+3. **Check device storage:**
+   - Device may be full
+   - Clear old logs if needed
+   - Check device capacity
+
+4. **Enable debug mode:**
+   Edit `.env`:
+   ```env
+   LOG_LEVEL=debug
+   ```
+   - Restart listener
+   - Look for detailed logs
+
+5. **Check attendance settings:**
+   - Device: Attendance → Settings
+   - Ensure logging is enabled
+   - Verify log storage is internal
+
+### Problem: Old logs keep appearing
+
+**Symptoms:**
+- Same attendance logs processed multiple times
+- Historical logs appearing
+
+**Solutions:**
+
+1. **Clear device logs:**
+   - Device menu: Data → Clear Attendance
+   - Or uncomment in `index.js`:
+   ```javascript
+   await zkInstance.clearAttendanceLog();
+   ```
+
+2. **Check last processed log:**
+   - Listener tracks last processed log
+   - Restart listener to reset
+   - Check for duplicate prevention
+
+## 🔧 Service Issues
+
+### Problem: Service won't install
+
+**Symptoms:**
+- `npm run install-service` fails
+- Permission errors
+- Service not appearing in Services
+
+**Solutions:**
+
+1. **Run as Administrator:**
+   - Right-click Command Prompt
+   - Select "Run as Administrator"
+   - Try install again
+
+2. **Check Node.js installation:**
+   ```bash
+   node --version
+   npm --version
+   ```
+   - Should show version numbers
+   - Reinstall Node.js if needed
+
+3. **Check node-windows:**
+   ```bash
+   npm install node-windows
+   ```
+
+4. **Manual service creation:**
+   - Use Windows Task Scheduler
+   - Create task to run `start.bat` on startup
+
+### Problem: Service won't start
+
+**Symptoms:**
+- Service installed but won't start
+- Status shows "Stopped"
+- Errors in Event Viewer
+
+**Solutions:**
+
+1. **Check Event Viewer:**
+   - Open `eventvwr.msc`
+   - Windows Logs → Application
+   - Look for errors from service
+
+2. **Verify .env file:**
+   - Ensure `.env` exists
+   - Check all variables are set
+   - No syntax errors
+
+3. **Check file paths:**
+   - Service must find `index.js`
+   - Verify working directory
+   - Check file permissions
+
+4. **Test manually first:**
+   ```bash
+   npm start
+   ```
+   - If works manually, service should work
+   - If fails, fix errors first
+
+### Problem: Service stops randomly
+
+**Symptoms:**
+- Service starts but stops after a while
+- Intermittent operation
+- No obvious errors
+
+**Solutions:**
+
+1. **Check logs:**
+   - Event Viewer for errors
+   - Look for crash reports
+   - Check for memory issues
+
+2. **Increase memory:**
+   Edit `install-service.js`:
+   ```javascript
+   nodeOptions: [
+     '--max_old_space_size=4096'  // Increase if needed
+   ]
+   ```
+
+3. **Check device connection:**
+   - Service may stop on connection loss
+   - Verify network stability
+   - Check reconnection logic
+
+4. **Monitor resources:**
+   - Task Manager → Details
+   - Look for node.exe
+   - Check CPU/memory usage
+
+## 🗄️ Database Issues
+
+### Error: "Failed to save attendance"
+
+**Symptoms:**
+- Listener receives log
+- Member found
+- Database insert fails
+
+**Solutions:**
+
+1. **Check Supabase connection:**
+   ```bash
+   # Test in browser
+   https://your-project.supabase.co
+   ```
+
+2. **Verify service role key:**
+   - Must be service_role key (not anon)
+   - Check key is valid
+   - Regenerate if needed
+
+3. **Check RLS policies:**
+   ```sql
+   -- Service role should bypass RLS
+   -- But verify policies exist
+   SELECT * FROM pg_policies WHERE tablename = 'checkins';
+   ```
+
+4. **Check table schema:**
+   ```sql
+   -- Verify columns exist
+   \d checkins
+   ```
+
+5. **Check foreign key:**
+   ```sql
+   -- Verify member_id exists
+   SELECT id FROM members WHERE id = 'uuid-here';
+   ```
+
+### Error: "Supabase client error"
+
+**Symptoms:**
+- Can't connect to Supabase
+- API errors
+- Timeout errors
+
+**Solutions:**
+
+1. **Check Supabase status:**
+   - Visit status.supabase.com
+   - Check for outages
+
+2. **Verify URL:**
+   - Must be full URL with https://
+   - No trailing slash
+   - Correct project subdomain
+
+3. **Check API key:**
+   - Must be service_role key
+   - Copy entire key (very long)
+   - No extra spaces
+
+4. **Test connection:**
+   ```javascript
+   // Add to test-connection.js
+   const { createClient } = require('@supabase/supabase-js');
+   const supabase = createClient(url, key);
+   const { data, error } = await supabase.from('members').select('count');
+   console.log(data, error);
+   ```
+
+## ⚡ Performance Issues
+
+### Problem: Slow attendance sync
+
+**Symptoms:**
+- Long delay between scan and database
+- Slow polling
+- Laggy updates
+
+**Solutions:**
+
+1. **Reduce poll interval:**
+   Edit `.env`:
+   ```env
+   POLL_INTERVAL=5  # Check every 5 seconds
+   ```
+
+2. **Check network speed:**
+   - Test ping time to device
+   - Check internet speed to Supabase
+   - Optimize network
+
+3. **Check device response:**
+   - Enable debug mode
+   - Look for slow queries
+   - Check device load
+
+4. **Optimize database:**
+   ```sql
+   -- Add indexes
+   CREATE INDEX idx_members_member_id ON members(member_id);
+   CREATE INDEX idx_checkins_member_id ON checkins(member_id);
+   ```
+
+### Problem: High CPU/memory usage
+
+**Symptoms:**
+- Node process using lots of resources
+- Computer slows down
+- Service crashes
+
+**Solutions:**
+
+1. **Increase poll interval:**
+   ```env
+   POLL_INTERVAL=30  # Less frequent polling
+   ```
+
+2. **Check for memory leaks:**
+   - Restart service daily
+   - Monitor memory over time
+   - Update dependencies
+
+3. **Reduce logging:**
+   ```env
+   LOG_LEVEL=info  # Less verbose
+   ```
+
+4. **Check for infinite loops:**
+   - Review logs for repeated errors
+   - Check reconnection logic
+   - Verify error handling
+
+## 🔐 Security Issues
+
+### Problem: Unauthorized access
+
+**Symptoms:**
+- Unknown attendance records
+- Suspicious activity
+- Security concerns
+
+**Solutions:**
+
+1. **Change device password:**
+   - Device menu: System → Password
+   - Use strong password
+   - Update `.env`
+
+2. **Secure .env file:**
+   - Never commit to git
+   - Restrict file permissions
+   - Keep service key secret
+
+3. **Check RLS policies:**
+   ```sql
+   -- Verify policies are correct
+   SELECT * FROM pg_policies;
+   ```
+
+4. **Monitor access:**
+   - Check Supabase logs
+   - Review attendance records
+   - Look for anomalies
+
+## 📱 Device Issues
+
+### Problem: Device not responding
+
+**Symptoms:**
+- Device frozen
+- No response to scans
+- Display blank or stuck
+
+**Solutions:**
+
+1. **Power cycle device:**
+   - Unplug power
+   - Wait 30 seconds
+   - Plug back in
+   - Wait for boot
+
+2. **Check device status:**
+   - Look at LED indicators
+   - Check display
+   - Listen for beeps
+
+3. **Factory reset (last resort):**
+   - Device menu: System → Reset
+   - Will erase all data
+   - Re-enroll users after
+
+### Problem: Fingerprint not recognized
+
+**Symptoms:**
+- Enrolled finger not recognized
+- Multiple scan attempts needed
+- Inconsistent recognition
+
+**Solutions:**
+
+1. **Clean scanner:**
+   - Use soft cloth
+   - Remove dust/dirt
+   - Dry thoroughly
+
+2. **Clean finger:**
+   - Wash and dry hands
+   - Remove moisture
+   - Avoid lotion
+
+3. **Re-enroll fingerprint:**
+   - Delete old enrollment
+   - Enroll again
+   - Use different finger if needed
+
+4. **Check scanner quality:**
+   - Scanner may be damaged
+   - Contact ZKTeco support
+   - Consider replacement
+
+## 🆘 Emergency Procedures
+
+### Complete System Reset
+
+If nothing works:
+
+1. **Stop listener:**
+   ```bash
+   # Manual: Ctrl+C
+   # Service: services.msc → Stop
+   ```
+
+2. **Power cycle device:**
+   - Unplug for 30 seconds
+   - Plug back in
+
+3. **Clear device logs:**
+   - Device menu: Data → Clear Attendance
+
+4. **Restart listener:**
+   ```bash
+   npm start
+   ```
+
+5. **Test with one user:**
+   - Enroll test user
+   - Scan fingerprint
+   - Verify attendance
+
+### Get Help
+
+1. **Check documentation:**
+   - README.md
+   - QUICK_SETUP.md
+   - Device manual
+
+2. **Enable debug mode:**
+   ```env
+   LOG_LEVEL=debug
+   ```
+
+3. **Collect information:**
+   - Error messages
+   - Log output
+   - Device model/firmware
+   - Network configuration
+
+4. **Contact support:**
+   - ZKTeco: support@zkteco.com
+   - Supabase: support@supabase.io
 
 ## 📋 Diagnostic Checklist
 
-When troubleshooting, check these in order:
+When troubleshooting, check:
 
-- [ ] Device is powered on (LED indicators)
-- [ ] Network cable connected properly
-- [ ] Device and PC on same network
-- [ ] Can ping device IP address
-- [ ] Credentials in `.env` are correct
-- [ ] Supabase URL and key are correct
-- [ ] Node.js is installed (v16+)
+- [ ] Device is powered on
+- [ ] Network cable connected
+- [ ] Can ping device IP
+- [ ] Device password correct
+- [ ] Node.js installed
 - [ ] Dependencies installed (`npm install`)
-- [ ] Fingerprint is enrolled in device
-- [ ] Employee number is set on device
-- [ ] Member exists in database with matching `member_id`
-- [ ] Supabase realtime is enabled
-- [ ] No firewall blocking connections
-- [ ] Only one listener instance running
+- [ ] `.env` file exists and configured
+- [ ] Supabase credentials valid
+- [ ] Members have matching member_id
+- [ ] Fingerprints enrolled on device
+- [ ] Device user IDs assigned
+- [ ] Connection test passes (`npm test`)
+- [ ] No firewall blocking
+- [ ] Only one listener running
+- [ ] Device time accurate
+- [ ] Database tables exist
+- [ ] RLS policies configured
+
+## 🎯 Prevention Tips
+
+**Avoid issues:**
+
+1. **Use static IP** for device
+2. **Regular backups** of database
+3. **Monitor logs** daily
+4. **Update firmware** periodically
+5. **Clean scanner** weekly
+6. **Test regularly** with known users
+7. **Document changes** to configuration
+8. **Train staff** on proper usage
 
 ---
 
-## 🆘 Getting Help
-
-If you're still stuck:
-
-1. **Gather information:**
-   - Error messages from console
-   - Output from `npm test`
-   - Device model and firmware version
-   - Node.js version (`node --version`)
-   - Operating system
-
-2. **Enable debug logging:**
-   ```env
-   LOG_LEVEL=debug
-   ```
-
-3. **Check documentation:**
-   - `README.md` - Complete guide
-   - `QUICK_SETUP.md` - Setup instructions
-   - `ARCHITECTURE.md` - System design
-   - `docs/ISAPI_EVENT_STREAM_GUIDE.md` - Technical details
-
-4. **Test each component:**
-   - Device connectivity
-   - Authentication
-   - Event stream
-   - Database connection
-   - Dashboard updates
-
-5. **Review logs carefully:**
-   - Look for patterns
-   - Note exact error messages
-   - Check timestamps
-
----
-
-## ✅ Verification Steps
-
-After fixing an issue, verify:
-
-1. **Connection test passes:**
-   ```bash
-   npm test
-   # Should show: 🎉 ALL TESTS PASSED!
-   ```
-
-2. **Listener connects:**
-   ```bash
-   npm start
-   # Should show: ✅ Connected to device event stream
-   ```
-
-3. **Events are received:**
-   - Scan fingerprint
-   - Check console for event log
-   - Should show: 🔔 Event received
-
-4. **Check-ins are saved:**
-   - Event should show: ✅ Check-in recorded
-   - Check Supabase dashboard
-   - Verify record in `checkins` table
-
-5. **Dashboard updates:**
-   - Open dashboard in browser
-   - Look for ⚡ lightning bolt
-   - Scan fingerprint
-   - Check-in should appear within 3 seconds
-
----
-
-**Most issues are related to network connectivity, credentials, or member_id mismatches. Start with the basics!** 🔍
+**Still stuck?** Run `npm test` and share the output for diagnosis.

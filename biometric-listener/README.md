@@ -1,11 +1,11 @@
-# Hikvision Biometric Event Listener
+# ZKTeco K40 Biometric Attendance Listener
 
-Real-time biometric attendance event listener for Hikvision fingerprint devices using ISAPI event stream.
+Real-time biometric attendance listener for ZKTeco K40 fingerprint devices.
 
 ## 🎯 What This Does
 
-- Connects to your Hikvision fingerprint device via ISAPI
-- Listens for real-time fingerprint scan events
+- Connects to ZKTeco K40 device via TCP socket (port 4370)
+- Polls attendance logs every 3 seconds (near real-time)
 - Automatically saves attendance to Supabase database
 - Dashboard updates instantly via Supabase realtime
 - Auto-reconnects if connection drops
@@ -14,8 +14,8 @@ Real-time biometric attendance event listener for Hikvision fingerprint devices 
 ## 📋 Prerequisites
 
 - Node.js 16+ installed
-- Hikvision fingerprint device on same network
-- Device credentials (username/password)
+- ZKTeco K40 device on same network (192.168.1.201:4370)
+- Device configured and fingerprints enrolled
 - Supabase service role key
 
 ## 🚀 Quick Start
@@ -33,14 +33,17 @@ Edit `.env` file with your settings:
 
 ```env
 # Device Configuration
-DEVICE_IP=192.168.1.64
-DEVICE_USERNAME=admin
-DEVICE_PASSWORD=@Smgym7?
-DEVICE_PORT=80
+DEVICE_IP=192.168.1.201
+DEVICE_PORT=4370
+DEVICE_PASSWORD=0
+DEVICE_TIMEOUT=5000
 
 # Supabase Configuration
-SUPABASE_URL=https://rhnerzynwcmwzorumqdq.supabase.co
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your_service_role_key_here
+
+# Polling (3 seconds = near real-time)
+POLL_INTERVAL=3
 ```
 
 **⚠️ IMPORTANT:** Get your Supabase Service Role Key:
@@ -56,15 +59,17 @@ npm start
 
 You should see:
 ```
-✅ Connected to device event stream
-👂 Listening for biometric events...
+✅ Connected to ZKTeco K40 device
+Device Model: K40
+🚀 Listener is running!
 ```
 
 ### 4. Test with Fingerprint Scan
 
-- Scan a fingerprint on the device
-- Watch the console for event logs
-- Check your dashboard - attendance should appear instantly!
+- Scan a fingerprint on the K40 device
+- Wait 3-5 seconds
+- Check console for event logs
+- Check dashboard - attendance should appear!
 
 ## 🔧 Installation Options
 
@@ -113,21 +118,29 @@ To uninstall service:
 npm run uninstall-service
 ```
 
-## 📊 Monitoring
+## 📊 How It Works
 
-### View Logs (Manual Mode)
-Logs appear in console when running `npm start`
+```
+1. Fingerprint Scan on K40 Device
+   ↓
+2. Device stores log in internal memory
+   ↓
+3. Listener polls device every 3 seconds
+   ↓
+4. New log detected
+   ↓
+5. Parse employee number and time
+   ↓
+6. Find member in database (by member_id)
+   ↓
+7. Insert check-in record
+   ↓
+8. Supabase realtime triggers
+   ↓
+9. Dashboard updates instantly ⚡
+```
 
-### View Logs (Service Mode)
-1. Open Event Viewer (eventvwr.msc)
-2. Windows Logs → Application
-3. Look for "Hikvision Biometric Listener" events
-
-### Check Service Status
-1. Press `Win + R`
-2. Type: `services.msc`
-3. Find "Hikvision Biometric Listener"
-4. Status should be "Running"
+**Total Delay: 3-5 seconds** (near real-time)
 
 ## 🔍 Troubleshooting
 
@@ -135,130 +148,83 @@ Logs appear in console when running `npm start`
 
 **Problem:** Can't connect to device
 ```
-❌ Connection failed: connect ETIMEDOUT
+❌ Failed to connect: connect ETIMEDOUT
 ```
 
 **Solutions:**
-- Verify device IP: `ping 192.168.1.64`
+- Verify device IP: `ping 192.168.1.201`
 - Check device is powered on
 - Ensure laptop and device on same network
-- Try accessing device in browser: `http://192.168.1.64`
+- Verify port 4370 is accessible
+- Check firewall settings
 
-### Authentication Issues
-
-**Problem:** 401 Unauthorized
-```
-❌ Connection failed: Request failed with status code 401
-```
-
-**Solutions:**
-- Verify username/password in `.env`
-- Check device credentials haven't changed
-- Try logging into device directly
-
-### No Events Received
-
-**Problem:** Connected but no events appear
-```
-✅ Connected to device event stream
-👂 Listening for biometric events...
-(nothing happens when scanning)
-```
-
-**Solutions:**
-- Verify fingerprint is enrolled in device
-- Check device event settings are enabled
-- Try scanning multiple times
-- Check device logs for errors
-
-### Database Issues
+### Member Not Found
 
 **Problem:** Events received but not saving
 ```
-⚠️ Member not found for employee number: 1001
+⚠️ Member not found for device user ID: 1001
 ```
 
 **Solutions:**
-- Verify member exists in database with matching `member_id`
-- Check Supabase service key is correct
-- Verify database connection
+- Verify member exists in database
+- Check `member_id` in database matches device user ID
+- Device user ID must be string, not number
+- Example: Device User ID "1001" = member_id "1001"
 
-## 🎛️ Configuration Options
+### Slow Updates
+
+**Problem:** Attendance appears after 10+ seconds
+
+**Solutions:**
+- Check POLL_INTERVAL in .env (should be 3)
+- Verify listener is running
+- Check network latency
+- Restart listener service
+
+## ⚙️ Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DEVICE_IP` | Device IP address | 192.168.1.64 |
-| `DEVICE_USERNAME` | Device username | admin |
-| `DEVICE_PASSWORD` | Device password | - |
-| `DEVICE_PORT` | Device HTTP port | 80 |
-| `SUPABASE_URL` | Supabase project URL | - |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key | - |
-| `RECONNECT_DELAY` | Reconnect delay (ms) | 5000 |
-| `LOG_LEVEL` | Log level (info/debug) | info |
+| Variable | Description | Default | Recommended |
+|----------|-------------|---------|-------------|
+| `DEVICE_IP` | K40 IP address | 192.168.1.201 | Your device IP |
+| `DEVICE_PORT` | K40 TCP port | 4370 | 4370 (standard) |
+| `DEVICE_PASSWORD` | Device password | 0 | 0 (default) |
+| `DEVICE_TIMEOUT` | Connection timeout (ms) | 5000 | 5000 |
+| `SUPABASE_URL` | Supabase project URL | - | Required |
+| `SUPABASE_SERVICE_KEY` | Service role key | - | Required |
+| `POLL_INTERVAL` | Poll frequency (seconds) | 3 | 2-5 seconds |
+| `LOG_LEVEL` | Log verbosity | info | info/debug |
 
-### Debug Mode
+### Performance Tuning
 
-For detailed logs, set in `.env`:
+**For faster updates (2-second delay):**
 ```env
-LOG_LEVEL=debug
+POLL_INTERVAL=2
 ```
 
-## 🔄 How It Works
-
-```
-1. Fingerprint Scan on Device
-   ↓
-2. Device sends event via ISAPI stream
-   ↓
-3. Listener receives event (1-2 seconds)
-   ↓
-4. Parse employee number and time
-   ↓
-5. Find member in database
-   ↓
-6. Insert check-in record
-   ↓
-7. Supabase realtime triggers
-   ↓
-8. Dashboard updates instantly ⚡
+**For lower network usage (5-second delay):**
+```env
+POLL_INTERVAL=5
 ```
 
-## 📝 Event Flow
-
-```javascript
-// Device sends XML event:
-<EventNotificationAlert>
-  <employeeNoString>1001</employeeNoString>
-  <dateTime>2024-02-10T14:30:00</dateTime>
-  <doorName>Main Entrance</doorName>
-</EventNotificationAlert>
-
-// Listener processes:
-- Finds member with member_id = "1001"
-- Creates check-in record
-- Updates member last_seen
-
-// Dashboard shows:
-✅ John Doe checked in at 2:30 PM
-```
+**⚠️ Don't go below 2 seconds** - may overload device
 
 ## 🛡️ Security Notes
 
 - `.env` file contains sensitive credentials - never commit to git
 - Service role key has full database access - keep secure
-- Device password should be strong
+- Device password should be changed from default
 - Consider running on dedicated PC for production
 
 ## 🎉 Success Indicators
 
 When everything is working:
 
-✅ Console shows: "Connected to device event stream"
-✅ Fingerprint scan triggers event log
+✅ Console shows: "Connected to ZKTeco K40 device"
+✅ Fingerprint scan triggers event log within 3-5 seconds
 ✅ Dashboard shows ⚡ lightning bolt (real-time active)
-✅ Attendance appears instantly on dashboard
+✅ Attendance appears on dashboard
 ✅ No browser refresh needed
 
 ## 📞 Support
@@ -267,16 +233,17 @@ If you encounter issues:
 
 1. Check logs for error messages
 2. Verify all configuration settings
-3. Test device connectivity with ping
-4. Ensure member_id matches employee number
+3. Test device connectivity: `ping 192.168.1.201`
+4. Ensure member_id matches device user ID exactly
 5. Check Supabase connection
+6. Verify device has attendance logs: Check device admin panel
 
 ## 🔧 Maintenance
 
 ### Regular Tasks
-- **Weekly:** Check listener is running
-- **Monthly:** Review logs for errors
-- **Quarterly:** Update dependencies (`npm update`)
+- **Daily:** Verify listener is running
+- **Weekly:** Check logs for errors
+- **Monthly:** Update dependencies (`npm update`)
 
 ### Restart Service
 ```bash
@@ -315,4 +282,4 @@ For a real gym environment:
 
 ---
 
-**Your gym now has enterprise-grade real-time attendance tracking!** 🎉
+**Your gym now has professional real-time attendance tracking with ZKTeco K40!** 🎉

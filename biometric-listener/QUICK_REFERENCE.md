@@ -1,6 +1,6 @@
-# ⚡ Quick Reference Card
+# ZKTeco K40 Quick Reference Card
 
-One-page reference for common tasks and commands.
+Quick commands and troubleshooting for ZKTeco K40 biometric system.
 
 ## 🚀 Quick Commands
 
@@ -14,243 +14,202 @@ npm test
 # Start listener (manual)
 npm start
 
-# Install as Windows Service (Admin required)
+# Install as Windows Service (run as Admin)
 npm run install-service
 
-# Uninstall Windows Service (Admin required)
+# Uninstall service (run as Admin)
 npm run uninstall-service
-
-# Start with debug logging
-# (Edit .env: LOG_LEVEL=debug, then)
-npm start
 ```
 
-## 📁 Important Files
+## 📝 Configuration
 
-| File | Purpose |
-|------|---------|
-| `.env` | Configuration (credentials, settings) |
-| `index.js` | Main listener code |
-| `package.json` | Dependencies and scripts |
-| `start.bat` | Quick start script for Windows |
-| `test-connection.js` | Connection testing tool |
-| `README.md` | Complete documentation |
-| `TROUBLESHOOTING.md` | Problem solving guide |
-
-## 🔧 Configuration (.env)
+**File:** `.env`
 
 ```env
-# Device Settings
-DEVICE_IP=192.168.1.64          # Device IP address
-DEVICE_USERNAME=admin            # Device username
-DEVICE_PASSWORD=@Smgym7?        # Device password
-DEVICE_PORT=80                   # HTTP port (usually 80)
-
-# Supabase Settings
-SUPABASE_URL=https://rhnerzynwcmwzorumqdq.supabase.co
-SUPABASE_SERVICE_KEY=your_key   # Service role key (NOT anon!)
-
-# Optional Settings
-RECONNECT_DELAY=5000            # Reconnect delay in ms (5 seconds)
-LOG_LEVEL=info                  # Log level: info or debug
+DEVICE_IP=192.168.1.201
+DEVICE_PORT=4370
+DEVICE_PASSWORD=0
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key
+POLL_INTERVAL=10
+LOG_LEVEL=info
 ```
 
-## 🔍 Diagnostic Commands
+## 🔍 Diagnostics
 
 ```bash
 # Test device connectivity
-ping 192.168.1.64
+ping 192.168.1.201
 
-# Test port access
-telnet 192.168.1.64 80
+# Test connection
+npm test
 
-# Check Node.js version
-node --version
+# Enable debug logging
+# Edit .env: LOG_LEVEL=debug
+npm start
 
-# Check npm version
-npm --version
-
-# View running Node processes
-tasklist | findstr node
-
-# Check if service is running
+# Check service status
 services.msc
-# Look for "Hikvision Biometric Listener"
+# Find "ZKTeco Biometric Listener"
 ```
 
-## 📊 Log Messages
+## 🗄️ Database Queries
 
-### Success Messages
-```
-✅ Connected to device event stream
-👂 Listening for biometric events...
-🔔 Event received: AccessControl | Employee: 1001
-✅ Check-in recorded for John Doe (ID: 1001)
-```
+```sql
+-- Check member exists
+SELECT * FROM members WHERE member_id = '1001';
 
-### Warning Messages
-```
-⚠️ Event stream ended
-🔄 Reconnecting in 5 seconds...
-⚠️ Member not found for employee number: 1001
-⏭️ Duplicate check-in prevented for John Doe
-```
+-- View recent check-ins
+SELECT m.name, c.check_in_time, c.entry_method
+FROM checkins c
+JOIN members m ON c.member_id = m.id
+ORDER BY c.check_in_time DESC
+LIMIT 10;
 
-### Error Messages
-```
-❌ Connection failed: connect ETIMEDOUT
-❌ Authentication failed
-❌ Failed to insert check-in: [error details]
-❌ Error saving attendance: [error details]
+-- Update member_id
+UPDATE members SET member_id = '1001' WHERE email = 'john@example.com';
+
+-- Check for duplicates
+SELECT member_id, check_in_time, COUNT(*)
+FROM checkins
+GROUP BY member_id, check_in_time
+HAVING COUNT(*) > 1;
 ```
 
 ## 🆘 Quick Troubleshooting
 
 | Problem | Quick Fix |
 |---------|-----------|
-| Can't connect | `ping 192.168.1.64` - Check network |
-| 401 Error | Verify credentials in `.env` |
-| No events | Check fingerprint is enrolled |
-| Member not found | Verify `member_id` matches employee number |
+| Connection failed | `ping 192.168.1.201` |
+| Member not found | Check `member_id` matches device user ID |
+| No logs | Verify fingerprint enrolled on device |
 | Service won't start | Run as Administrator |
-| High CPU | Increase `RECONNECT_DELAY` |
+| Slow sync | Reduce `POLL_INTERVAL` to 5 |
+| High CPU | Increase `POLL_INTERVAL` to 30 |
 
-## 🎯 Common Tasks
+## 📊 Status Indicators
 
-### Start Listener Manually
-```bash
-cd biometric-listener
-npm start
+**Listener Console:**
+```
+✅ Connected to ZKTeco K40 device     → Working
+🚀 Listener is running!                → Working
+[SUCCESS] Attendance saved             → Working
+[ERROR] Connection failed              → Check device
+[ERROR] Member not found               → Check member_id
 ```
 
-### Stop Listener
-```
-Press Ctrl+C in terminal
-```
+**Device:**
+- Green LED = Ready
+- Beep on scan = Recognized
+- Red LED = Error
 
-### Restart Service
-```bash
-# Method 1: Services GUI
-services.msc
-# Right-click "Hikvision Biometric Listener" → Restart
+## 🔑 Key Concepts
 
-# Method 2: Command line (Admin)
-net stop "Hikvision Biometric Listener"
-net start "Hikvision Biometric Listener"
-```
+**Device User ID = member_id**
+- Device: User enrolled with ID `1001`
+- Database: Member with `member_id = "1001"`
+- Must match exactly!
 
-### View Service Logs
-```bash
-# Open Event Viewer
-eventvwr.msc
-# Navigate to: Windows Logs → Application
-# Filter by: "Hikvision Biometric Listener"
-```
+**Polling:**
+- Listener checks device every 10 seconds
+- Fetches new attendance logs
+- Saves to database
 
-### Update Configuration
-```bash
-# 1. Stop listener/service
-# 2. Edit .env file
-# 3. Restart listener/service
-```
-
-### Enable Debug Logging
-```bash
-# Edit .env
-LOG_LEVEL=debug
-
-# Restart listener
-npm start
-```
-
-## 📋 Pre-Flight Checklist
-
-Before starting listener:
-
-- [ ] Node.js installed (v16+)
-- [ ] Dependencies installed (`npm install`)
-- [ ] `.env` file configured
-- [ ] Device IP is correct
-- [ ] Device credentials are correct
-- [ ] Supabase service key added
-- [ ] Device is powered on
-- [ ] Device is on same network
-- [ ] Can ping device IP
-
-## 🔄 Event Flow
-
-```
-1. Member scans finger
-   ↓
-2. Device sends event (1-2 sec)
-   ↓
-3. Listener receives event
-   ↓
-4. Parse employee number
-   ↓
-5. Find member in database
-   ↓
-6. Insert check-in record
-   ↓
-7. Dashboard updates (real-time)
-   ↓
-8. Staff sees attendance (instant)
-```
-
-## 🎯 Success Indicators
-
-System is working when:
-
-✅ Console shows: "Connected to device event stream"
-✅ Fingerprint scan triggers event log
-✅ Event log shows employee number
-✅ Check-in is saved to database
-✅ Dashboard shows ⚡ lightning bolt
-✅ Attendance appears within 3 seconds
-✅ No errors in console
+**Duplicate Prevention:**
+- Ignores scans within 1 minute
+- Prevents accidental double check-ins
 
 ## 📞 Quick Links
 
-- **Setup**: `QUICK_SETUP.md`
-- **Full Guide**: `README.md`
-- **Troubleshooting**: `TROUBLESHOOTING.md`
-- **Architecture**: `ARCHITECTURE.md`
-- **Get Started**: `../GET_STARTED.md`
+- **Quick Setup:** `QUICK_SETUP.md`
+- **Full README:** `README.md`
+- **Troubleshooting:** `TROUBLESHOOTING.md`
+- **Device Setup:** `../ZKTECO_DEVICE_SETUP_GUIDE.md`
+- **Software Setup:** `../ZKTECO_SOFTWARE_SETUP_GUIDE.md`
 
-## 🔑 Important Notes
+## 🎯 Common Tasks
 
-1. **Member ID must match Employee Number**
-   - Database `member_id` = Device Employee No
-   - Example: Both should be "1001"
+**Enroll new member:**
+1. Add to database, note `member_id` (e.g., "1003")
+2. Device menu → User → New User
+3. Enter ID: `1003`
+4. Enroll fingerprint
+5. Test scan
 
-2. **Use Service Role Key**
-   - NOT the anon key
-   - Found in Supabase Dashboard → Settings → API
+**Check service status:**
+1. Press `Win + R`
+2. Type: `services.msc`
+3. Find "ZKTeco Biometric Listener"
+4. Check status is "Running"
 
-3. **Keep Listener Running**
-   - Use Windows Service for 24/7 operation
-   - Or use Startup Folder for auto-start
+**View logs (service mode):**
+1. Press `Win + R`
+2. Type: `eventvwr.msc`
+3. Windows Logs → Application
+4. Filter by "ZKTeco Biometric Listener"
 
-4. **Network Requirements**
-   - Device and PC must be on same network
-   - Use wired Ethernet (recommended)
-   - Avoid WiFi for reliability
+**Restart service:**
+```bash
+# In Services (services.msc)
+Right-click → Restart
+```
 
-5. **Security**
-   - Never commit `.env` to git
-   - Keep credentials secure
-   - Use strong device password
+## 🔧 Performance Tuning
 
-## 💡 Pro Tips
+**Faster updates:**
+```env
+POLL_INTERVAL=5  # Check every 5 seconds
+```
 
-- **Test first**: Always run `npm test` before starting
-- **Debug mode**: Enable when troubleshooting
-- **Monitor logs**: Check regularly for errors
-- **Backup config**: Save `.env` file securely
-- **Document changes**: Note any configuration changes
-- **Test recovery**: Verify auto-reconnect works
-- **Plan maintenance**: Schedule updates during off-hours
+**Less network traffic:**
+```env
+POLL_INTERVAL=30  # Check every 30 seconds
+```
+
+**Debug mode:**
+```env
+LOG_LEVEL=debug  # Detailed logging
+```
+
+**Production mode:**
+```env
+LOG_LEVEL=info  # Normal logging
+```
+
+## ✅ Health Check
+
+System is healthy when:
+- ✅ `npm test` passes
+- ✅ Listener shows "Connected"
+- ✅ Scan triggers log output
+- ✅ Database record created
+- ✅ Dashboard updates
+- ✅ Service status "Running"
+
+## 🚨 Emergency
+
+**System not working:**
+1. Stop listener (Ctrl+C or stop service)
+2. Power cycle device (unplug 30 sec)
+3. Run `npm test`
+4. If passes, start listener
+5. Test with one scan
+
+**Complete reset:**
+```bash
+# Stop service
+services.msc → Stop
+
+# Clear device logs
+Device menu → Data → Clear Attendance
+
+# Restart service
+services.msc → Start
+
+# Test
+npm test
+```
 
 ---
 
-**Keep this card handy for quick reference!** 📌
+**Print this card and keep it handy!** 📋

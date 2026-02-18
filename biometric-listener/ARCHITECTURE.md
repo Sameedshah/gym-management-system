@@ -1,58 +1,59 @@
-# System Architecture
+# System Architecture - ZKTeco K40 Integration
 
 ## 🏗️ Complete System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         GYM ATTENDANCE SYSTEM                        │
-│                    (Enterprise Real-time Architecture)               │
+│                    GYM ATTENDANCE SYSTEM                             │
+│              (ZKTeco K40 Near Real-time Architecture)                │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────┐
 │   GYM MEMBER    │
 │                 │
 │  👤 John Doe    │
-│  ID: 1001       │
+│  Device ID: 1001│
 └────────┬────────┘
          │
          │ Scans Fingerprint
          ▼
 ┌─────────────────┐
-│   HIKVISION     │
+│   ZKTECO K40    │
 │   FINGERPRINT   │  📍 Location: Gym Entrance
-│     DEVICE      │  🌐 IP: 192.168.1.64
-│                 │  👤 User: admin
-│  DS-K1T8xx      │  🔑 Pass: @Smgym7?
+│     DEVICE      │  🌐 IP: 192.168.1.201
+│                 │  🔌 Port: 4370 (TCP)
+│  Standalone     │  🔑 Password: 0
+│  Access Control │  📊 Protocol: ZKTeco Proprietary
 └────────┬────────┘
          │
-         │ ISAPI Event Stream
-         │ (HTTP Long-polling)
-         │ Port: 80
-         │ Protocol: HTTP Digest Auth
+         │ TCP Socket Connection
+         │ (Polling every 3 seconds)
+         │ Protocol: zklib
          │
          ▼
 ┌─────────────────┐
 │   NODE.JS       │
-│   LISTENER      │  💻 Runs on: Your Laptop/PC
+│   LISTENER      │  💻 Runs on: Your PC/Server
 │                 │  📂 Location: biometric-listener/
 │  • index.js     │  🔄 Status: Always Running
-│  • Digest Auth  │  ⚡ Delay: 1-2 seconds
-│  • XML Parser   │  🔌 Connection: Persistent
+│  • zklib        │  ⚡ Delay: 3-5 seconds
+│  • TCP Client   │  🔌 Connection: Persistent polling
 │  • Auto-reconnect│ 🛡️ Duplicate Prevention
+│  • Log Parser   │  📊 Poll Interval: 3 seconds
 └────────┬────────┘
          │
-         │ HTTP POST
+         │ HTTPS POST
          │ (Attendance Data)
          │
          ▼
 ┌─────────────────┐
 │   SUPABASE      │
 │   DATABASE      │  ☁️ Cloud: PostgreSQL
-│                 │  🌐 URL: rhnerzynwcmwzorumqdq.supabase.co
+│                 │  🌐 URL: your-project.supabase.co
 │  Tables:        │  🔐 Auth: Service Role Key
 │  • members      │  ⚡ Realtime: Enabled
 │  • checkins     │  🛡️ RLS: Enabled
-│  • invoices     │
+│  • invoices     │  📊 WebSocket: Active
 └────────┬────────┘
          │
          │ Realtime Subscription
@@ -84,39 +85,43 @@
 
 ### 1. Fingerprint Scan
 ```
-Member scans finger on device
+Member scans finger on K40 device
 ↓
 Device captures fingerprint
 ↓
 Device matches against enrolled templates
 ↓
-Match found: Employee #1001
+Match found: Device User ID 1001
+↓
+Device stores log in internal memory
 ```
 
-### 2. Event Generation
+### 2. Log Storage (Device Side)
 ```
-Device generates event:
+K40 stores attendance log:
 {
-  eventType: "AccessControl",
-  employeeNoString: "1001",
-  dateTime: "2024-02-10T14:30:00",
-  doorName: "Main Entrance"
+  deviceUserId: 1001,
+  recordTime: "2024-02-10T14:30:00",
+  verifyMode: 1 (fingerprint),
+  inOutMode: 0 (check-in)
 }
 ↓
-Device converts to XML format
+Log stored in device RAM
 ↓
-Device pushes to ISAPI stream
+Waiting for listener to poll
 ```
 
-### 3. Event Reception
+### 3. Polling & Retrieval
 ```
-Node.js listener receives event
+Node.js listener polls device (every 3 seconds)
 ↓
-Parse XML to JavaScript object
+Send: "Get attendance logs" command
 ↓
-Extract: employeeNo, time, door
+Device responds with new logs
 ↓
-Validate event data
+Listener receives log data
+↓
+Parse binary data to JavaScript object
 ```
 
 ### 4. Database Lookup
@@ -139,9 +144,8 @@ INSERT INTO checkins:
   member_id: "uuid-john-doe",
   check_in_time: "2024-02-10T14:30:00",
   entry_method: "biometric",
-  scanner_id: "1001",
-  device_name: "Main Entrance",
-  notes: "Auto-synced from biometric device"
+  device_name: "ZKTeco K40",
+  notes: "Device User ID: 1001"
 }
 ↓
 Database insert successful
@@ -171,20 +175,21 @@ Dashboard shows:
 📊 Today's count: +1
 ```
 
-**Total Time: 2-3 seconds** ⚡
+**Total Time: 3-5 seconds** ⚡
 
 ## 🔌 Connection Types
 
-### ISAPI Event Stream (Device → Listener)
+### TCP Socket (Listener → K40 Device)
 ```
-Type: HTTP Long-polling
-Direction: Device → Listener
-Protocol: HTTP/1.1
-Port: 80
-Auth: Digest Authentication
-Format: XML (multipart/mixed)
-Persistence: Always connected
-Reconnect: Automatic (5 seconds)
+Type: TCP Socket (Polling)
+Direction: Listener → Device
+Protocol: ZKTeco Proprietary
+Port: 4370
+Auth: Password (default: 0)
+Format: Binary
+Persistence: Reconnects automatically
+Poll Interval: 3 seconds
+Library: zklib (npm package)
 ```
 
 ### Database Connection (Listener → Supabase)
@@ -212,14 +217,13 @@ Channels: checkins-realtime
 
 ### Layer 1: Device Authentication
 ```
-HTTP Digest Authentication
+TCP Connection
 ↓
-Username: admin
-Password: @Smgym7? (hashed)
+Password: 0 (default)
 ↓
-Challenge-response mechanism
+Binary protocol
 ↓
-MD5 hashing
+Local network only
 ```
 
 ### Layer 2: Database Security
@@ -268,8 +272,8 @@ Input validation
      email: "john@example.com"
    }
    ↓
-3. Admin enrolls fingerprint on device
-   - Employee No: 1001  ← Must match member_id!
+3. Admin enrolls fingerprint on K40 device
+   - Device User ID: 1001  ← Must match member_id!
    - Scan finger 3 times
    ↓
 4. Device stores fingerprint template
@@ -283,17 +287,19 @@ Input validation
    ↓
 2. Device matches fingerprint
    ↓
-3. Event sent via ISAPI stream
+3. Device stores log in memory
    ↓
-4. Listener receives and processes
+4. Listener polls device (3 seconds)
    ↓
-5. Database lookup by member_id
+5. Listener retrieves new logs
    ↓
-6. Check-in record created
+6. Database lookup by member_id
    ↓
-7. Dashboard updates in real-time
+7. Check-in record created
    ↓
-8. Staff sees attendance instantly
+8. Dashboard updates in real-time
+   ↓
+9. Staff sees attendance (3-5 sec delay)
 ```
 
 ## 🔄 Error Handling
@@ -302,35 +308,20 @@ Input validation
 ```
 Device connection drops
 ↓
-Listener detects disconnection
+Listener detects timeout
 ↓
-Log: "⚠️ Event stream ended"
+Log: "Failed to connect"
 ↓
 Wait 5 seconds
 ↓
-Attempt reconnection
+Attempt reconnection (max 5 attempts)
 ↓
-Retry with exponential backoff
-↓
-Success: Resume listening
-```
-
-### Authentication Failure
-```
-401 Unauthorized received
-↓
-Log: "❌ Authentication failed"
-↓
-Check credentials in .env
-↓
-Verify device password
-↓
-Retry with correct credentials
+Success: Resume polling
 ```
 
 ### Member Not Found
 ```
-Event received: Employee #9999
+Log received: Device User ID 9999
 ↓
 Database query: No match
 ↓
@@ -338,70 +329,22 @@ Log: "⚠️ Member not found: 9999"
 ↓
 Event skipped (not saved)
 ↓
-Continue listening
+Continue polling
 ```
 
 ### Duplicate Event
 ```
-Event received: Employee #1001
+Log received: Device User ID 1001
 ↓
 Check recent check-ins (1-min window)
 ↓
 Duplicate found
 ↓
-Log: "⏭️ Duplicate prevented"
+Log: "Skipping duplicate"
 ↓
 Event skipped
 ↓
-Continue listening
-```
-
-## 🚀 Deployment Scenarios
-
-### Scenario A: Testing (Laptop)
-```
-Developer Laptop
-├── Node.js Listener (foreground)
-├── Browser (dashboard)
-└── Same network as device
-
-Pros: Easy testing, see logs
-Cons: Not 24/7, manual start
-```
-
-### Scenario B: Small Gym (Startup)
-```
-Office PC
-├── Node.js Listener (startup folder)
-├── Auto-start on login
-└── Runs during business hours
-
-Pros: Simple, no admin rights
-Cons: Only when logged in
-```
-
-### Scenario C: Production (Service)
-```
-Dedicated PC
-├── Node.js Listener (Windows Service)
-├── Auto-start on boot
-├── Runs 24/7
-└── UPS backup
-
-Pros: Reliable, professional
-Cons: Requires admin setup
-```
-
-### Scenario D: Enterprise (Multiple Devices)
-```
-Server/Raspberry Pi
-├── Listener 1 → Device 1 (Main Entrance)
-├── Listener 2 → Device 2 (Back Door)
-├── Listener 3 → Device 3 (Gym Floor)
-└── Central monitoring
-
-Pros: Scalable, redundant
-Cons: More complex setup
+Continue polling
 ```
 
 ## 📈 Performance Characteristics
@@ -410,23 +353,30 @@ Cons: More complex setup
 ```
 Fingerprint Scan:        0ms (instant)
 Device Processing:       100-500ms
-ISAPI Stream Push:       500-1000ms
+Device Log Storage:      50ms
+Polling Wait:            0-3000ms (avg 1500ms)
 Network Transfer:        10-50ms
 Listener Processing:     50-100ms
 Database Insert:         100-300ms
 Realtime Broadcast:      50-100ms
 Dashboard Update:        50-100ms
 ─────────────────────────────────
-Total Delay:             ~2-3 seconds ⚡
+Total Delay:             ~3-5 seconds ⚡
 ```
 
 ### Resource Usage
 ```
 Node.js Listener:
-├── CPU: < 1% (idle), ~5% (event)
-├── Memory: 50-100 MB
-├── Network: < 1 KB/s (idle), ~10 KB/s (event)
+├── CPU: < 1% (idle), ~3% (polling)
+├── Memory: 30-50 MB
+├── Network: < 1 KB/s (polling)
 └── Disk: Negligible
+
+K40 Device:
+├── CPU: < 5%
+├── Memory: Internal RAM
+├── Storage: 3000+ fingerprints
+└── Logs: 100,000+ records
 
 Dashboard:
 ├── CPU: < 5% (browser)
@@ -437,15 +387,17 @@ Dashboard:
 
 ### Scalability Limits
 ```
-Single Device:
+Single K40 Device:
+├── Max fingerprints: 3,000
+├── Max logs: 100,000
 ├── Max scans/hour: 100+
-├── Max scans/day: 2000+
-└── Concurrent users: 1000+
+└── Max scans/day: 2,000+
 
 Single Listener:
 ├── Devices supported: 1
-├── Events/second: 10+
-└── Uptime: 99.9%+
+├── Polls/minute: 20
+├── Events/second: 5+
+└── Uptime: 99%+
 
 Database:
 ├── Check-ins/day: 10,000+
@@ -460,15 +412,16 @@ Database:
 Listener PC:
 ├── CPU: Any modern processor
 ├── RAM: 2 GB minimum, 4 GB recommended
-├── Disk: 1 GB free space
+├── Disk: 500 MB free space
 ├── Network: Ethernet (recommended)
 └── OS: Windows 10/11, Linux, macOS
 
-Biometric Device:
-├── Model: Hikvision DS-K1T8xx or similar
+K40 Device:
+├── Model: ZKTeco K40
 ├── Firmware: Latest version
 ├── Network: Ethernet connection
-└── Power: 12V DC adapter
+├── Power: 12V DC adapter
+└── Capacity: 3,000 fingerprints
 ```
 
 ### Software Requirements
@@ -476,6 +429,7 @@ Biometric Device:
 Listener:
 ├── Node.js: 16+ (18 LTS recommended)
 ├── npm: 8+
+├── zklib: 1.0.8+
 └── Dependencies: See package.json
 
 Dashboard:
@@ -497,12 +451,12 @@ Bandwidth:
 └── Latency: < 100ms
 
 Connectivity:
-├── Device → Listener: Same LAN
+├── Device → Listener: Same LAN (required)
 ├── Listener → Supabase: Internet
 └── Dashboard → Supabase: Internet
 
 Ports:
-├── Device: 80 (HTTP)
+├── K40 Device: 4370 (TCP)
 ├── Supabase: 443 (HTTPS)
 └── Realtime: 443 (WSS)
 ```
@@ -511,22 +465,22 @@ Ports:
 
 ### System Health
 ```
-✅ Listener connected to device
-✅ Event stream active
+✅ Listener connected to K40 device
+✅ Polling active (every 3 seconds)
 ✅ Database connection stable
 ✅ Dashboard showing ⚡ indicator
-✅ Check-ins appearing in real-time
+✅ Check-ins appearing in 3-5 seconds
 ✅ No errors in logs
 ✅ Uptime > 99%
 ```
 
 ### Performance Metrics
 ```
-✅ Event latency < 3 seconds
+✅ Event latency < 5 seconds
 ✅ Database response < 500ms
 ✅ Dashboard update < 1 second
 ✅ CPU usage < 5%
-✅ Memory usage < 200 MB
+✅ Memory usage < 100 MB
 ✅ No connection drops
 ✅ No duplicate events
 ```
@@ -542,6 +496,35 @@ Ports:
 ✅ Professional appearance
 ```
 
+## 🔧 Technical Limitations
+
+### ZKTeco K40 Constraints
+```
+❌ No push events (must poll)
+❌ No event stream API
+❌ Binary protocol only
+❌ Limited to local network
+✅ Reliable and stable
+✅ Industry standard
+✅ Cost-effective
+```
+
+### Polling vs Real-time
+```
+True Real-time (Hikvision):
+├── Push events: Instant
+├── Delay: 1-2 seconds
+└── Protocol: HTTP Event Stream
+
+Near Real-time (ZKTeco K40):
+├── Polling: Every 3 seconds
+├── Delay: 3-5 seconds
+└── Protocol: TCP Socket
+
+Conclusion: 3-5 second delay is acceptable
+for gym attendance tracking
+```
+
 ---
 
-**This architecture provides enterprise-grade real-time attendance tracking at a fraction of the cost of commercial solutions!** 🚀
+**This architecture provides professional near real-time attendance tracking with ZKTeco K40 at an affordable cost!** 🚀

@@ -1,112 +1,153 @@
-# ⚡ Quick Setup Guide
+# ZKTeco K40 Quick Setup (5 Minutes)
 
-Get your real-time biometric listener running in 5 minutes!
+Get your ZKTeco K40 biometric attendance system running in 5 minutes!
 
-## Step 1: Install Node.js (if not installed)
+## ⚡ Prerequisites
 
-Download from: https://nodejs.org/
-- Choose LTS version (recommended)
-- Run installer with default settings
+- ZKTeco K40 device connected to network
+- Device IP: `192.168.1.201` (or note your IP)
+- Node.js installed
+- Supabase project ready
 
-## Step 2: Get Supabase Service Key
+## 🚀 Setup Steps
 
-1. Go to: https://supabase.com/dashboard
-2. Select your project
-3. Click **Settings** → **API**
-4. Copy the **service_role** key (NOT anon key!)
-5. Keep it safe - you'll need it in Step 4
-
-## Step 3: Install Dependencies
-
-Open Command Prompt in `biometric-listener` folder:
+### 1. Install Dependencies (1 minute)
 
 ```bash
-cd biometric-listener
+cd zkteco-listener
 npm install
 ```
 
-Wait for installation to complete (1-2 minutes).
+### 2. Configure Environment (2 minutes)
 
-## Step 4: Configure Settings
-
-Edit `.env` file and add your Supabase service key:
-
-```env
-# Device is already configured
-DEVICE_IP=192.168.1.64
-DEVICE_USERNAME=admin
-DEVICE_PASSWORD=@Smgym7?
-
-# ADD YOUR SUPABASE KEY HERE:
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your_actual_key_here
+Copy example file:
+```bash
+copy .env.example .env
 ```
 
-## Step 5: Test Run
+Edit `.env`:
+```env
+# Device
+DEVICE_IP=192.168.1.201
+DEVICE_PORT=4370
+DEVICE_PASSWORD=0
 
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key_here
+
+# Polling
+POLL_INTERVAL=10
+```
+
+**Get Supabase credentials:**
+1. Go to Supabase Dashboard
+2. Settings → API
+3. Copy Project URL
+4. Copy service_role key (NOT anon key!)
+
+### 3. Test Connection (1 minute)
+
+```bash
+npm test
+```
+
+**Expected:**
+```
+✅ Socket connection established
+✅ Device information retrieved
+✅ Found X enrolled user(s)
+🎉 ALL TESTS PASSED!
+```
+
+**If fails:**
+- Check device IP: `ping 192.168.1.201`
+- Verify device is powered on
+- Check device password
+
+### 4. Link Members (1 minute)
+
+**CRITICAL:** Device user ID must match database `member_id`!
+
+**Check device users:**
+```bash
+npm test
+# Look for: User ID: 1001, Name: John Doe
+```
+
+**Update database:**
+```sql
+UPDATE members
+SET member_id = '1001'
+WHERE email = 'john@example.com';
+```
+
+### 5. Start Listener (30 seconds)
+
+**Option A: Manual (Testing)**
 ```bash
 npm start
 ```
 
-You should see:
-```
-✅ Connected to device event stream
-👂 Listening for biometric events...
-```
+**Option B: Double-click**
+- Double-click `start.bat`
 
-## Step 6: Test with Fingerprint
-
-1. Scan a fingerprint on the device
-2. Watch the console - you should see:
-   ```
-   🔔 Event received: AccessControl | Employee: 1001 | Time: 2024-02-10T14:30:00
-   ✅ Check-in recorded for John Doe (ID: 1001)
-   ```
-3. Check your dashboard - attendance should appear instantly!
-
-## Step 7: Auto-Start on Windows Boot (Optional)
-
-### Simple Method (Startup Folder):
-1. Press `Win + R`
-2. Type: `shell:startup`
-3. Drag `start.bat` into this folder
-4. Done! Will start when you login
-
-### Advanced Method (Windows Service):
+**Option C: Windows Service (Production)**
 ```bash
-# Run Command Prompt as Administrator
+# Run as Administrator
 npm run install-service
 ```
 
-Service will now auto-start on Windows boot!
+## ✅ Verify It's Working
 
-## ✅ Success Checklist
+1. **Check console:**
+   ```
+   ✅ Connected to ZKTeco K40 device
+   🚀 Listener is running!
+   ```
 
-- [ ] Node.js installed
-- [ ] Dependencies installed (`npm install`)
-- [ ] Supabase service key added to `.env`
-- [ ] Test run successful (`npm start`)
-- [ ] Fingerprint scan creates attendance
-- [ ] Dashboard shows attendance instantly
-- [ ] Auto-start configured (optional)
+2. **Scan fingerprint** on device
+
+3. **Watch logs:**
+   ```
+   [INFO] Found 1 attendance log(s)
+   [SUCCESS] ✅ Attendance saved for John Doe
+   ```
+
+4. **Check database:**
+   ```sql
+   SELECT * FROM checkins ORDER BY check_in_time DESC LIMIT 1;
+   ```
+
+5. **Check dashboard** - should show new attendance!
+
+## 🎉 Done!
+
+Your system is now running! Attendance will sync every 10 seconds.
 
 ## 🆘 Quick Troubleshooting
 
-**Can't connect to device:**
+**Connection failed?**
 ```bash
-ping 192.168.1.64
+ping 192.168.1.201
 ```
-If no response, check device power and network cable.
 
-**401 Unauthorized:**
-- Verify device password in `.env` is correct
-- Try logging into device directly
+**Member not found?**
+- Check `member_id` matches device user ID
+- Device ID must be string: `"1001"` not `1001`
 
-**Member not found:**
-- Ensure member exists in database
-- Check `member_id` matches employee number on device
+**No logs?**
+- Verify fingerprint is enrolled
+- Check device user ID is set
+- Enable debug mode: `LOG_LEVEL=debug`
 
-**Need help?** Check `README.md` for detailed troubleshooting.
+## 📚 Full Documentation
+
+- **Device Setup:** `../ZKTECO_DEVICE_SETUP_GUIDE.md`
+- **Software Setup:** `../ZKTECO_SOFTWARE_SETUP_GUIDE.md`
+- **Full README:** `README.md`
+- **Troubleshooting:** `TROUBLESHOOTING.md`
 
 ---
 
-**That's it! Your real-time biometric system is now running!** 🎉
+**Need help?** Check the full documentation or run `npm test` to diagnose issues.

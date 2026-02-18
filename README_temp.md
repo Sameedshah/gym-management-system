@@ -89,38 +89,38 @@ git push origin main
 
 **📚 Detailed Guide**: See [docs/QUICK_START.md](docs/QUICK_START.md)
 
-## 👆 Biometric Integration (Near Real-time)
+## 👆 Biometric Integration (Real-time)
 
-This system supports **near real-time attendance tracking** with ZKTeco K40 fingerprint devices.
+This system supports **real-time attendance tracking** with ZKTeco fingerprint devices.
 
 ### Supported Devices
 
-#### ZKTeco K40 (Primary Device)
+#### 1. ZKTeco K40
 
 **Best for:** Standard gym setups, cost-effective solution
 
 **Quick Setup:**
 ```bash
-cd biometric-listener
+cd zkteco-listener
 npm install
 npm test
 npm start
 ```
 
 **Features:**
-- ⚡ Near real-time updates (3-5 second delay)
+- ⚡ Real-time updates (10-15 second delay)
 - 💰 Cost-effective solution
 - 🔄 Auto-reconnect on connection loss
 - 🛡️ Duplicate prevention
 - 📊 Live dashboard updates
 - 🚀 Production-ready
-- 🔌 TCP Socket connection (port 4370)
 
 **Documentation:**
-- 📖 [Complete Guide](biometric-listener/README.md)
-- 🏗️ [Architecture](biometric-listener/ARCHITECTURE.md)
-- ⚡ [Quick Setup (5 min)](biometric-listener/QUICK_SETUP.md)
-- 🆘 [Troubleshooting](biometric-listener/TROUBLESHOOTING.md)
+- 📖 [Complete Guide](docs/ZKTECO_COMPLETE_GUIDE.md)
+- 🔧 [Device Setup](docs/ZKTECO_DEVICE_SETUP_GUIDE.md)
+- 💻 [Software Setup](docs/ZKTECO_SOFTWARE_SETUP_GUIDE.md)
+- ⚡ [Quick Setup (5 min)](zkteco-listener/QUICK_SETUP.md)
+- 🆘 [Troubleshooting](zkteco-listener/TROUBLESHOOTING.md)
 
 **Configuration:**
 ```env
@@ -128,31 +128,34 @@ DEVICE_IP=192.168.1.201
 DEVICE_PORT=4370
 DEVICE_PASSWORD=0
 SUPABASE_SERVICE_KEY=your_service_role_key
-POLL_INTERVAL=3
+POLL_INTERVAL=10
 ```
 
 ### How It Works
-
 ```
-Fingerprint Scan → Device Stores Log → Listener Polls (3s) → Supabase → Dashboard
-     (instant)        (local)            (your PC)          (cloud)    (real-time)
-                                                                        
-Total Delay: 3-5 seconds ⚡
+Fingerprint Scan → Device Stores Log → Listener Polls (10s) → Supabase → Dashboard
+     (instant)        (local)            (your PC)           (cloud)    (real-time)
 ```
 
 ### Deployment Options
 
 The listener service supports:
 - 🖥️ Manual start (testing)
-- 🚀 Windows Startup (simple auto-start)
-- 🏢 Windows Service (production - recommended)
-- 💻 Dedicated PC/Server (best for 24/7 operation)
+- 🚀 Windows Startup (simple)
+- 🏢 Windows Service (production)
+- 💻 Dedicated PC (recommended)
 
-**Install as Windows Service:**
-```bash
-cd biometric-listener
-npm run install-service  # Run as Administrator
-```
+### Choosing a Device
+
+| Feature | ZKTeco K40 | Hikvision |
+|---------|------------|-----------|
+| Cost | $ | $$$ |
+| Setup Difficulty | Easy | Medium |
+| Update Speed | 10-15s | 1-2s |
+| Reliability | Excellent | Excellent |
+| Best For | Most gyms | Enterprise |
+
+**Recommendation:** Start with ZKTeco K40 for cost-effectiveness and ease of setup.
 
 ## Production Deployment
 
