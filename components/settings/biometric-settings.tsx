@@ -14,7 +14,6 @@ import { toast } from "sonner"
 interface BiometricSettings {
   enabled: boolean
   deviceIP: string
-  username: string
   password: string
   port: number
   autoSync: boolean
@@ -31,12 +30,11 @@ interface DeviceStatus {
 export function BiometricSettings() {
   const [settings, setSettings] = useState<BiometricSettings>({
     enabled: false,
-    deviceIP: "192.168.1.64",
-    username: "gymapi",
-    password: "",
-    port: 80,
+    deviceIP: "192.168.1.201",
+    password: "0",
+    port: 4370,
     autoSync: true,
-    syncInterval: 5
+    syncInterval: 3
   })
   
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>({
@@ -97,7 +95,6 @@ export function BiometricSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deviceIP: settings.deviceIP,
-          username: settings.username,
           password: settings.password,
           port: settings.port
         })
@@ -154,7 +151,7 @@ export function BiometricSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Fingerprint className="h-5 w-5" />
-          Biometric Scanner Settings
+          ZKTeco K40 Biometric Scanner Settings
         </CardTitle>
         <div className="flex items-center gap-2">
           {deviceStatus.connected ? (
@@ -205,11 +202,14 @@ export function BiometricSettings() {
               <Label htmlFor="deviceIP">Device IP Address</Label>
               <Input
                 id="deviceIP"
-                placeholder="192.168.1.64"
+                placeholder="192.168.1.201"
                 value={settings.deviceIP}
                 onChange={(e) => setSettings({ ...settings, deviceIP: e.target.value })}
                 disabled={!settings.enabled}
               />
+              <p className="text-xs text-muted-foreground">
+                ZKTeco K40 device IP address
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -217,34 +217,29 @@ export function BiometricSettings() {
               <Input
                 id="port"
                 type="number"
-                placeholder="80"
+                placeholder="4370"
                 value={settings.port}
                 onChange={(e) => setSettings({ ...settings, port: Number(e.target.value) })}
                 disabled={!settings.enabled}
               />
+              <p className="text-xs text-muted-foreground">
+                Default: 4370 (TCP)
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                placeholder="gymapi"
-                value={settings.username}
-                onChange={(e) => setSettings({ ...settings, username: e.target.value })}
-                disabled={!settings.enabled}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="password">Device Password</Label>
               <Input
                 id="password"
-                type="password"
-                placeholder="Enter device password"
+                type="text"
+                placeholder="0"
                 value={settings.password}
                 onChange={(e) => setSettings({ ...settings, password: e.target.value })}
                 disabled={!settings.enabled}
               />
+              <p className="text-xs text-muted-foreground">
+                Default password is "0" (zero). No username required for ZKTeco devices.
+              </p>
             </div>
           </div>
 
@@ -252,7 +247,7 @@ export function BiometricSettings() {
             <Button 
               variant="outline" 
               onClick={handleTestConnection}
-              disabled={!settings.enabled || isTesting || !settings.deviceIP || !settings.username || !settings.password}
+              disabled={!settings.enabled || isTesting || !settings.deviceIP || !settings.password}
             >
               <TestTube className="h-4 w-4 mr-2" />
               {isTesting ? 'Testing...' : 'Test Connection'}
@@ -277,13 +272,13 @@ export function BiometricSettings() {
                 <div className="flex-1">
                   <h4 className="font-medium text-sm">Complete Setup Guide</h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Full installation from unboxing to real-time webhooks
+                    Full installation from device setup to listener service
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm"
                     className="mt-2 h-7 text-xs"
-                    onClick={() => window.open('/api/docs/complete-setup-guide', '_blank')}
+                    onClick={() => window.open('https://github.com/Sameedshah/gym-management-system/blob/master/biometric-listener/README.md', '_blank')}
                   >
                     📖 Full Guide
                   </Button>
@@ -297,17 +292,17 @@ export function BiometricSettings() {
                   <span className="text-green-600 font-bold text-sm">2</span>
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-medium text-sm">ISAPI Configuration</h4>
+                  <h4 className="font-medium text-sm">Device Setup</h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Device API setup and user management
+                    Configure ZKTeco K40 device and enroll fingerprints
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm"
                     className="mt-2 h-7 text-xs"
-                    onClick={() => window.open('/api/docs/setup-guide', '_blank')}
+                    onClick={() => window.open('https://github.com/Sameedshah/gym-management-system/blob/master/docs/ZKTECO_DEVICE_SETUP_GUIDE.md', '_blank')}
                   >
-                    🔧 ISAPI Guide
+                    🔧 Device Guide
                   </Button>
                 </div>
               </div>
@@ -319,17 +314,17 @@ export function BiometricSettings() {
                   <span className="text-purple-600 font-bold text-sm">3</span>
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-medium text-sm">Real-time Webhooks</h4>
+                  <h4 className="font-medium text-sm">Listener Service</h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Configure instant push notifications
+                    Install and configure background listener service
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm"
                     className="mt-2 h-7 text-xs"
-                    onClick={() => window.open('/api/docs/realtime-setup-guide', '_blank')}
+                    onClick={() => window.open('https://github.com/Sameedshah/gym-management-system/blob/master/biometric-listener/QUICK_SETUP.md', '_blank')}
                   >
-                    ⚡ Webhook Guide
+                    ⚡ Quick Setup
                   </Button>
                 </div>
               </div>
@@ -339,27 +334,33 @@ export function BiometricSettings() {
 
         <Separator />
 
-        {/* Real-time Webhook Configuration */}
+        {/* Listener Service Information */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Real-time Push Configuration</h3>
+          <h3 className="text-lg font-medium">Background Listener Service</h3>
           
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-start gap-3">
               <Zap className="h-5 w-5 text-blue-500 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-medium text-blue-900">Enterprise Real-time Updates</h4>
+                <h4 className="font-medium text-blue-900">Near Real-time Updates (3-5 seconds)</h4>
                 <p className="text-sm text-blue-700 mt-1">
-                  Configure your device to push attendance instantly instead of polling every few minutes.
+                  The ZKTeco K40 listener service polls the device every 3 seconds for new attendance logs.
                 </p>
                 <div className="mt-3 space-y-2">
                   <div className="text-xs">
-                    <span className="font-medium">Webhook URL:</span>
+                    <span className="font-medium">Service Location:</span>
                     <code className="ml-2 px-2 py-1 bg-blue-100 rounded text-blue-800 text-xs">
-                      {typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/api/webhooks/hikvision
+                      biometric-listener/
+                    </code>
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium">Installation:</span>
+                    <code className="ml-2 px-2 py-1 bg-blue-100 rounded text-blue-800 text-xs">
+                      cd biometric-listener && npm install && npm start
                     </code>
                   </div>
                   <div className="text-xs text-blue-600">
-                    ✅ No cron jobs needed • ✅ Instant updates • ✅ Works on free hosting
+                    ✅ Auto-reconnect • ✅ Duplicate prevention • ✅ Windows Service support
                   </div>
                 </div>
               </div>
@@ -388,18 +389,18 @@ export function BiometricSettings() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="syncInterval">Sync Interval (minutes)</Label>
+            <Label htmlFor="syncInterval">Listener Poll Interval (seconds)</Label>
             <Input
               id="syncInterval"
               type="number"
-              min="1"
-              max="60"
+              min="2"
+              max="10"
               value={settings.syncInterval}
               onChange={(e) => setSettings({ ...settings, syncInterval: Number(e.target.value) })}
               disabled={!settings.enabled || !settings.autoSync}
             />
             <p className="text-xs text-muted-foreground">
-              How often to sync attendance records (1-60 minutes)
+              How often the listener polls the device (2-10 seconds). Default: 3 seconds for near real-time.
             </p>
           </div>
 
