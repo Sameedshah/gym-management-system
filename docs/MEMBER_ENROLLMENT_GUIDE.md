@@ -35,6 +35,14 @@ Join Date: Today's date
 Status: Active
 ```
 
+**⚠️ IMPORTANT: Skip Fingerprint Enrollment in Dashboard!**
+
+If your dashboard has a "Enroll Fingerprint" or "Biometric Enrollment" section:
+- **SKIP IT!** ❌ Don't use it
+- This is for different device types
+- ZKTeco K40 fingerprints are enrolled directly on the device
+- Just fill in the basic member information above
+
 ### Step 3: Important - Member ID
 
 **⚠️ CRITICAL:** The `member_id` field MUST match the "User ID" you'll use on the K40 device.
@@ -55,6 +63,11 @@ Status: Active
 1. Click "Save" or "Add Member"
 2. Member appears in the members list
 3. Note down the member_id (e.g., 1001)
+
+**What You Just Did:**
+- ✅ Created member record in database
+- ✅ Assigned member_id: 1001
+- ❌ Did NOT enroll fingerprint (that's next step on device)
 
 ---
 
