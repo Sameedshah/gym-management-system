@@ -166,8 +166,9 @@ async function saveAttendanceRecord(member, timestamp, deviceUserId) {
         member_id: member.id,
         check_in_time: timestamp.toISOString(),
         entry_method: 'biometric',
+        scanner_id: deviceUserId.toString(),
         device_name: 'ZKTeco K40',
-        notes: `Device User ID: ${deviceUserId}`,
+        notes: `Auto-synced from ZKTeco K40 - Device User ID: ${deviceUserId}`,
       })
       .select()
       .single();
