@@ -22,7 +22,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "dotenv": "^16.3.1",
-    "zklib": "^1.0.8",
+    "zklib": "^0.2.1",
     "node-windows": "^1.0.0-beta.8"
   },
   "devDependencies": {

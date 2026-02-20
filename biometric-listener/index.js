@@ -7,14 +7,15 @@ const config = {
   device: {
     ip: process.env.DEVICE_IP || '192.168.1.201',
     port: parseInt(process.env.DEVICE_PORT) || 4370,
-    password: process.env.DEVICE_PASSWORD || '0',
-    timeout: parseInt(process.env.DEVICE_TIMEOUT) || 5000,
+    inport: parseInt(process.env.DEVICE_INPORT) || 5200,
+    timeout: parseInt(process.env.DEVICE_TIMEOUT) || 10000,
   },
   supabase: {
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_SERVICE_KEY,
   },
   pollInterval: parseInt(process.env.POLL_INTERVAL) || 3,
+  useRealtime: process.env.USE_REALTIME !== 'false', // Default to true
   logLevel: process.env.LOG_LEVEL || 'info',
 };
 
@@ -32,8 +33,10 @@ let zkInstance = null;
 let isConnected = false;
 let lastProcessedLog = null;
 let reconnectAttempts = 0;
+let isConnecting = false; // Prevent multiple simultaneous connection attempts
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000;
+const processedLogs = new Set(); // Track processed logs to avoid duplicates
 
 // Logging utility
 const log = {
@@ -50,44 +53,109 @@ const log = {
 /**
  * Connect to ZKTeco device
  */
-async function connectToDevice() {
-  try {
-    log.info(`Connecting to ZKTeco device at ${config.device.ip}:${config.device.port}...`);
+function connectToDevice() {
+  return new Promise((resolve, reject) => {
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+      reject(new Error('Connection attempt already in progress'));
+      return;
+    }
     
-    zkInstance = new ZKLib(
-      config.device.ip,
-      config.device.port,
-      config.device.timeout,
-      config.device.password
-    );
-
-    await zkInstance.createSocket();
-    isConnected = true;
-    reconnectAttempts = 0;
+    isConnecting = true;
     
-    log.success(`✅ Connected to ZKTeco K40 device`);
-    
-    // Get device info
-    const deviceInfo = await zkInstance.getInfo();
-    log.info(`Device Model: ${deviceInfo.model || 'Unknown'}`);
-    log.info(`Firmware Version: ${deviceInfo.fwVersion || 'Unknown'}`);
-    log.info(`Serial Number: ${deviceInfo.serialNumber || 'Unknown'}`);
-    
-    return true;
-  } catch (error) {
-    isConnected = false;
-    log.error(`Failed to connect: ${error.message}`);
-    return false;
-  }
+    try {
+      log.info(`Connecting to ZKTeco device at ${config.device.ip}:${config.device.port}...`);
+      
+      // Clean up any existing instance first
+      if (zkInstance) {
+        try {
+          zkInstance.disconnect();
+        } catch (e) {
+          // Ignore errors during cleanup
+        }
+        zkInstance = null;
+      }
+      
+      zkInstance = new ZKLib(config.device);
+      
+      zkInstance.connect((err) => {
+        isConnecting = false;
+        
+        if (err) {
+          isConnected = false;
+          log.error(`Failed to connect: ${err.message}`);
+          log.error(`Error details: ${JSON.stringify(err)}`);
+          
+          // Clean up failed instance
+          if (zkInstance) {
+            try {
+              zkInstance.disconnect();
+            } catch (e) {
+              // Ignore
+            }
+            zkInstance = null;
+          }
+          
+          reject(err);
+          return;
+        }
+        
+        isConnected = true;
+        reconnectAttempts = 0;
+        log.success(`✅ Connected to ZKTeco K40 device`);
+        
+        // Get device info
+        zkInstance.version((err, version) => {
+          if (!err) {
+            log.info(`Device Version: ${version}`);
+          }
+        });
+        
+        zkInstance.serialNumber((err, serial) => {
+          if (!err) {
+            log.info(`Serial Number: ${serial}`);
+          }
+        });
+        
+        // Enable device for communication
+        zkInstance.enableDevice((err) => {
+          if (err) {
+            log.debug(`Could not enable device: ${err.message}`);
+          } else {
+            log.debug('Device enabled for communication');
+          }
+        });
+        
+        resolve();
+      });
+    } catch (error) {
+      isConnecting = false;
+      isConnected = false;
+      log.error(`Exception during connection: ${error.message}`);
+      log.error(`Stack: ${error.stack}`);
+      
+      // Clean up on exception
+      if (zkInstance) {
+        try {
+          zkInstance.disconnect();
+        } catch (e) {
+          // Ignore
+        }
+        zkInstance = null;
+      }
+      
+      reject(error);
+    }
+  });
 }
 
 /**
  * Disconnect from device
  */
-async function disconnectFromDevice() {
+function disconnectFromDevice() {
   if (zkInstance && isConnected) {
     try {
-      await zkInstance.disconnect();
+      zkInstance.disconnect();
       log.info('Disconnected from device');
     } catch (error) {
       log.error(`Error disconnecting: ${error.message}`);
@@ -95,6 +163,9 @@ async function disconnectFromDevice() {
   }
   isConnected = false;
   zkInstance = null;
+  
+  // Wait a bit for socket to fully close
+  return new Promise(resolve => setTimeout(resolve, 1000));
 }
 
 /**
@@ -184,79 +255,146 @@ async function saveAttendanceRecord(member, timestamp, deviceUserId) {
 }
 
 /**
- * Process attendance logs from device
+ * Process a single attendance log entry
  */
-async function processAttendanceLogs() {
-  if (!isConnected || !zkInstance) {
-    log.debug('Device not connected, skipping log processing');
-    return;
-  }
-
+async function processLogEntry(logEntry) {
   try {
-    log.debug('Fetching attendance logs from device...');
+    const deviceUserId = logEntry.uid;
+    const timestamp = logEntry.timestamp;
     
-    // Get attendance logs
-    const logs = await zkInstance.getAttendances();
+    // Enhanced debugging
+    log.info(`📋 RAW LOG DATA: ${JSON.stringify(logEntry)}`);
+    log.info(`👤 Device User ID: ${deviceUserId} (Type: ${typeof deviceUserId})`);
+    log.debug(`Processing log: User ID ${deviceUserId} at ${timestamp}`);
+
+    // Create unique log key
+    const logKey = `${deviceUserId}-${timestamp.getTime()}`;
     
-    if (!logs || logs.data.length === 0) {
-      log.debug('No new attendance logs found');
+    // Skip if already processed in this session
+    if (processedLogs.has(logKey)) {
+      log.debug('Skipping already processed log');
       return;
     }
 
-    log.info(`Found ${logs.data.length} attendance log(s)`);
-
-    // Process each log
-    for (const logEntry of logs.data) {
-      try {
-        const deviceUserId = logEntry.deviceUserId;
-        const timestamp = logEntry.recordTime;
-        
-        log.debug(`Processing log: User ID ${deviceUserId} at ${timestamp}`);
-
-        // Skip if we've already processed this exact log
-        const logKey = `${deviceUserId}-${timestamp.getTime()}`;
-        if (lastProcessedLog === logKey) {
-          log.debug('Skipping already processed log');
-          continue;
-        }
-
-        // Find member in database
-        const member = await findMemberByDeviceId(deviceUserId);
-        
-        if (!member) {
-          log.error(`⚠️ Member not found for device user ID: ${deviceUserId}`);
-          log.info('Please ensure member_id in database matches device user ID');
-          continue;
-        }
-
-        // Save attendance record
-        const saved = await saveAttendanceRecord(member, timestamp, deviceUserId);
-        
-        if (saved) {
-          lastProcessedLog = logKey;
-        }
-      } catch (error) {
-        log.error(`Error processing log entry: ${error.message}`);
-      }
+    // Find member in database
+    const member = await findMemberByDeviceId(deviceUserId);
+    
+    if (!member) {
+      log.error(`⚠️ Member not found for device user ID: ${deviceUserId}`);
+      log.error(`🔍 TROUBLESHOOTING:`);
+      log.error(`   1. Check if User ID "${deviceUserId}" exists in members table (member_id column)`);
+      log.error(`   2. Verify fingerprint was enrolled on K40 device with correct User ID`);
+      log.error(`   3. User ID "0" means fingerprint not enrolled or enrolled with ID 0`);
+      log.error(`   4. Run: SELECT member_id, name FROM members; in Supabase to see all member IDs`);
+      return;
     }
 
-    // Clear processed logs from device (optional - comment out if you want to keep logs on device)
-    // await zkInstance.clearAttendanceLog();
-    // log.debug('Cleared processed logs from device');
+    // Save attendance record
+    const saved = await saveAttendanceRecord(member, timestamp, deviceUserId);
     
+    if (saved) {
+      processedLogs.add(logKey);
+      lastProcessedLog = logKey;
+    }
   } catch (error) {
-    log.error(`Error fetching attendance logs: ${error.message}`);
-    
-    // If connection error, try to reconnect
-    if (error.message.includes('socket') || error.message.includes('timeout')) {
-      isConnected = false;
-      log.info('Connection lost, will attempt to reconnect...');
-    }
+    log.error(`Error processing log entry: ${error.message}`);
   }
 }
 
 /**
- * Main polling loop - Optimized for near real-time performance
+ * Setup real-time log monitoring
+ */
+function setupRealTimeMonitoring() {
+  if (!isConnected || !zkInstance) {
+    log.error('Cannot setup real-time monitoring: device not connected');
+    return false;
+  }
+
+  try {
+    log.info('Setting up real-time attendance monitoring...');
+    
+    zkInstance.getRealTimeLogs((err, logEntry) => {
+      if (err) {
+        log.error(`Real-time log error: ${err.message}`);
+        return;
+      }
+      
+      if (logEntry) {
+        log.info(`📍 Real-time log received: User ${logEntry.uid}`);
+        processLogEntry(logEntry);
+      }
+    });
+    
+    log.success('✅ Real-time monitoring active');
+    return true;
+  } catch (error) {
+    log.error(`Failed to setup real-time monitoring: ${error.message}`);
+    log.info('Will continue with polling mode only');
+    return false;
+  }
+}
+
+/**
+ * Process attendance logs from device
+ */
+function processAttendanceLogs() {
+  return new Promise((resolve, reject) => {
+    if (!isConnected || !zkInstance) {
+      log.debug('Device not connected, skipping log processing');
+      resolve();
+      return;
+    }
+
+    log.debug('Fetching attendance logs from device...');
+    
+    try {
+      zkInstance.getAttendance((err, logs) => {
+        if (err) {
+          // Check if it's a "no data" error
+          if (err.message && (err.message.includes('out of range') || err.message.includes('Timeout'))) {
+            log.debug('No attendance logs available on device');
+            resolve();
+            return;
+          }
+          
+          log.error(`Error fetching attendance logs: ${err.message}`);
+          
+          // If connection error, mark as disconnected
+          if (err.message.includes('socket') || err.message.includes('timeout')) {
+            isConnected = false;
+            log.info('Connection lost, will attempt to reconnect...');
+          }
+          
+          resolve(); // Don't reject, just continue
+          return;
+        }
+        
+        if (!logs || logs.length === 0) {
+          log.debug('No attendance logs found');
+          resolve();
+          return;
+        }
+
+        log.info(`Found ${logs.length} attendance log(s)`);
+
+        // Process each log
+        (async () => {
+          for (const logEntry of logs) {
+            await processLogEntry(logEntry);
+          }
+          
+          resolve();
+        })();
+      });
+    } catch (error) {
+      log.error(`Exception while fetching logs: ${error.message}`);
+      resolve(); // Don't reject, just continue
+    }
+  });
+}
+
+/**
+ * Main polling loop
  */
 async function startPolling() {
   log.info(`Starting attendance polling (every ${config.pollInterval} seconds)...`);
@@ -268,7 +406,11 @@ async function startPolling() {
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
         log.info(`Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`);
-        await connectToDevice();
+        try {
+          await connectToDevice();
+        } catch (error) {
+          log.error(`Reconnection failed: ${error.message}`);
+        }
       } else {
         log.error('Max reconnection attempts reached. Please check device and restart service.');
         return;
@@ -277,7 +419,11 @@ async function startPolling() {
 
     // Process logs if connected
     if (isConnected) {
-      await processAttendanceLogs();
+      try {
+        await processAttendanceLogs();
+      } catch (error) {
+        log.error(`Error in polling cycle: ${error.message}`);
+      }
     }
   }, config.pollInterval * 1000);
 }
@@ -304,23 +450,44 @@ async function main() {
   log.info('='.repeat(60));
   log.info(`Device: ${config.device.ip}:${config.device.port}`);
   log.info(`Poll Interval: ${config.pollInterval} seconds`);
+  log.info(`Real-time Mode: ${config.useRealtime ? 'Enabled' : 'Disabled'}`);
   log.info(`Log Level: ${config.logLevel}`);
   log.info('='.repeat(60));
 
   // Initial connection
-  const connected = await connectToDevice();
-  
-  if (!connected) {
+  try {
+    await connectToDevice();
+    
+    // Setup real-time monitoring if enabled
+    if (config.useRealtime) {
+      setupRealTimeMonitoring();
+    }
+  } catch (error) {
     log.error('Failed to establish initial connection');
     log.info(`Will retry in ${RECONNECT_DELAY / 1000} seconds...`);
-    setTimeout(main, RECONNECT_DELAY);
-    return;
+    
+    // Ensure cleanup and wait for socket to be released
+    if (zkInstance) {
+      try {
+        zkInstance.disconnect();
+      } catch (e) {
+        // Ignore
+      }
+      zkInstance = null;
+    }
+    
+    // Wait before retrying to allow socket to be released
+    await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY));
+    
+    // Retry connection (don't call main again, just retry connect)
+    return main();
   }
 
-  // Start polling
+  // Start polling as backup (in case real-time monitoring misses something)
   startPolling();
   
   log.success('🚀 Listener is running! Press Ctrl+C to stop.');
+  log.info('💡 Using real-time monitoring for instant attendance capture');
 }
 
 // Start the application
