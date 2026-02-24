@@ -1,9 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { DashboardStats } from "@/components/dashboard/dashboard-stats"
-import { RecentCheckIns } from "@/components/dashboard/recent-checkins"
 import { NotificationCard } from "@/components/dashboard/notification-card"
-import { ScannerStatus } from "@/components/dashboard/scanner-status"
 import { AdminOverview } from "@/components/admin/admin-overview"
 import { AuthGuard } from "@/components/auth/auth-guard"
 
@@ -19,14 +17,12 @@ export default function DashboardPage() {
               <DashboardStats />
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2">
                   <AdminOverview />
-                  <RecentCheckIns />
                 </div>
 
-                <div className="space-y-6">
+                <div>
                   <NotificationCard />
-                  <ScannerStatus />
                 </div>
               </div>
             </div>
