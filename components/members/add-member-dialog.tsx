@@ -18,10 +18,9 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Loader2, Fingerprint, User, CheckCircle } from "lucide-react"
+import { Plus, Loader2, User, CheckCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { FingerprintScanner } from "@/components/biometric/fingerprint-scanner"
 
 export function AddMemberDialog() {
   const [open, setOpen] = useState(false)
@@ -35,28 +34,8 @@ export function AddMemberDialog() {
     membership_type: "standard",
     plan_name: "Strength Training" as "Strength Training" | "Cardio" | "Personal Training",
   })
-  const [biometricData, setBiometricData] = useState<{
-    biometric_id: string
-    fingerprint_data: string
-    scanner_device_id: string
-  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-
-  const handleBiometricScan = (data: {
-    biometric_id: string
-    fingerprint_data: string
-    scanner_device_id: string
-  }) => {
-    setBiometricData(data)
-    setError(null)
-    // Auto-advance to next tab after successful scan
-    setTimeout(() => setCurrentTab("review"), 1000)
-  }
-
-  const handleBiometricError = (errorMsg: string) => {
-    setError(errorMsg)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,31 +48,55 @@ export function AddMemberDialog() {
       ...formData,
       status: "active",
       join_date: new Date().toISOString().split("T")[0],
-      ...(biometricData && {
-        biometric_id: biometricData.biometric_id,
-        fingerprint_data: biometricData.fingerprint_data,
-        scanner_device_id: biometricData.scanner_device_id,
-      })
     }
 
-    const { error } = await supabase.from("members").insert(memberData)
+    // Insert member
+    const { data: newMember, error: memberError } = await supabase
+      .from("members")
+      .insert(memberData)
+      .select()
+      .single()
 
-    if (!error) {
-      setOpen(false)
-      setFormData({ name: "", father_name: "", email: "", phone: "", membership_type: "standard", plan_name: "Strength Training" })
-      setBiometricData(null)
-      setCurrentTab("basic")
-      router.refresh()
-    } else {
-      setError(error.message)
+    if (memberError) {
+      setError(memberError.message)
+      setIsLoading(false)
+      return
     }
 
+    // Create initial due invoice for the first month
+    const today = new Date()
+    const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    
+    const invoiceData = {
+      member_id: newMember.id,
+      invoice_number: invoiceNumber,
+      status: "due",
+      months_due: 1,
+      due_date: today.toISOString().split("T")[0],
+      description: "Initial membership fee - First month",
+      sms_sent: false,
+      email_sent: false,
+      reminder_count: 0,
+    }
+
+    const { error: invoiceError } = await supabase
+      .from("invoices")
+      .insert(invoiceData)
+
+    if (invoiceError) {
+      console.error("Failed to create initial invoice:", invoiceError)
+      // Don't block member creation if invoice fails
+    }
+
+    setOpen(false)
+    setFormData({ name: "", father_name: "", email: "", phone: "", membership_type: "standard", plan_name: "Strength Training" })
+    setCurrentTab("basic")
+    router.refresh()
     setIsLoading(false)
   }
 
   const resetForm = () => {
     setFormData({ name: "", father_name: "", email: "", phone: "", membership_type: "standard", plan_name: "Strength Training" })
-    setBiometricData(null)
     setCurrentTab("basic")
     setError(null)
   }
@@ -114,18 +117,14 @@ export function AddMemberDialog() {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Member</DialogTitle>
-          <DialogDescription>Create a new gym member account with biometric registration</DialogDescription>
+          <DialogDescription>Create a new gym member account</DialogDescription>
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="basic" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Basic Info
-            </TabsTrigger>
-            <TabsTrigger value="biometric" disabled={!canProceedToReview} className="flex items-center gap-2">
-              <Fingerprint className="h-4 w-4" />
-              Biometric
             </TabsTrigger>
             <TabsTrigger value="review" disabled={!canProceedToReview} className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
@@ -207,58 +206,11 @@ export function AddMemberDialog() {
               </Button>
               <Button 
                 type="button" 
-                onClick={() => setCurrentTab("biometric")}
+                onClick={() => setCurrentTab("review")}
                 disabled={!canProceedToReview}
               >
-                Next: Biometric Setup
+                Next: Review
               </Button>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="biometric" className="space-y-4">
-            <div className="text-center space-y-4">
-              <h3 className="text-lg font-medium">Fingerprint Registration</h3>
-              <p className="text-sm text-muted-foreground">
-                Register the member's fingerprint for secure access to the gym facilities.
-              </p>
-              
-              <div className="flex justify-center">
-                <FingerprintScanner 
-                  onScanComplete={handleBiometricScan}
-                  onError={handleBiometricError}
-                />
-              </div>
-
-              {biometricData && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Fingerprint registered successfully! Biometric ID: {biometricData.biometric_id}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
-            <div className="flex justify-between gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setCurrentTab("basic")}>
-                Back
-              </Button>
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => setCurrentTab("review")}
-                >
-                  Skip Biometric
-                </Button>
-                <Button 
-                  type="button" 
-                  onClick={() => setCurrentTab("review")}
-                  disabled={!biometricData}
-                >
-                  Continue to Review
-                </Button>
-              </div>
             </div>
           </TabsContent>
 
@@ -298,25 +250,11 @@ export function AddMemberDialog() {
                   <Badge variant="outline">Standard Membership</Badge>
                 </div>
 
-                <div>
-                  <Label className="text-sm text-muted-foreground">Biometric Registration</Label>
-                  <div className="flex items-center gap-2">
-                    {biometricData ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-success" />
-                        <span className="text-success">Registered</span>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {biometricData.biometric_id}
-                        </Badge>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-muted-foreground">Not registered</span>
-                        <Badge variant="secondary">Optional</Badge>
-                      </>
-                    )}
-                  </div>
-                </div>
+                <Alert>
+                  <AlertDescription>
+                    A due invoice for the first month will be automatically created upon registration.
+                  </AlertDescription>
+                </Alert>
               </div>
 
               {error && (
@@ -327,7 +265,7 @@ export function AddMemberDialog() {
             </div>
 
             <div className="flex justify-between gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setCurrentTab("biometric")}>
+              <Button type="button" variant="outline" onClick={() => setCurrentTab("basic")}>
                 Back
               </Button>
               <Button onClick={handleSubmit} disabled={isLoading}>

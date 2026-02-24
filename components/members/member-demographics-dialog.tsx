@@ -92,7 +92,9 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     Status
                   </div>
-                  <Badge className={getStatusColor(member.status)}>{member.status}</Badge>
+                  <Badge className={getStatusColor(member.status || 'inactive')}>
+                    {member.status || 'Unknown'}
+                  </Badge>
                 </div>
               </div>
 
@@ -101,21 +103,19 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span>Father Name: {member.father_name}</span>
+                  <span>Father Name: {member.father_name || <span className="text-muted-foreground italic">Not provided</span>}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{member.email}</span>
+                  <span>{member.email || <span className="text-muted-foreground italic">Not provided</span>}</span>
                 </div>
-                {member.phone && (
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{member.phone}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{member.phone || <span className="text-muted-foreground italic">Not provided</span>}</span>
+                </div>
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Joined: {new Date(member.join_date).toLocaleDateString()}</span>
+                  <span>Joined: {member.join_date ? new Date(member.join_date).toLocaleDateString() : <span className="text-muted-foreground italic">Invalid Date</span>}</span>
                 </div>
                 {member.biometric_id && (
                   <div className="flex items-center gap-3">
@@ -137,7 +137,9 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
                 <div>
                   <span className="text-sm text-muted-foreground">Current Plan:</span>
                   <div className="font-medium">
-                    <Badge variant="outline" className="ml-2">{member.plan_name}</Badge>
+                    <Badge variant="outline" className="ml-2">
+                      {member.plan_name || <span className="text-muted-foreground italic">Not assigned</span>}
+                    </Badge>
                   </div>
                 </div>
 
