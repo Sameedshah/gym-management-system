@@ -13,6 +13,7 @@ interface CheckinData {
   member?: {
     name: string
     member_id: string
+    months_due?: number
   }
 }
 
@@ -54,9 +55,21 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
             .eq('id', payload.new.member_id)
             .single()
           
+          // Get overdue invoices count
+          const { data: overdueInvoices } = await supabase
+            .from('invoices')
+            .select('months_due')
+            .eq('member_id', payload.new.member_id)
+            .eq('status', 'due')
+          
+          const totalMonthsDue = overdueInvoices?.reduce((sum, inv) => sum + (inv.months_due || 0), 0) || 0
+          
           const newCheckin: CheckinData = {
             ...payload.new as CheckinData,
-            member: memberData || undefined
+            member: memberData ? {
+              ...memberData,
+              months_due: totalMonthsDue
+            } : undefined
           }
           
           // Add to recent check-ins (keep only last 10)
@@ -119,11 +132,26 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
         .limit(10)
       
       if (checkins) {
+        // Fetch overdue invoices for all members
+        const memberIds = checkins.map(c => c.member_id).filter(Boolean)
+        const { data: overdueInvoices } = await supabase
+          .from('invoices')
+          .select('member_id, months_due')
+          .in('member_id', memberIds)
+          .eq('status', 'due')
+        
+        // Calculate total months due per member
+        const monthsDueByMember = overdueInvoices?.reduce((acc, inv) => {
+          acc[inv.member_id] = (acc[inv.member_id] || 0) + (inv.months_due || 0)
+          return acc
+        }, {} as Record<string, number>) || {}
+        
         const formattedCheckins = checkins.map(checkin => ({
           ...checkin,
           member: checkin.members ? {
             name: (checkin.members as any).name,
-            member_id: (checkin.members as any).member_id
+            member_id: (checkin.members as any).member_id,
+            months_due: monthsDueByMember[checkin.member_id] || 0
           } : undefined
         }))
         setRecentCheckins(formattedCheckins)

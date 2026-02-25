@@ -21,7 +21,7 @@ export function DashboardStats() {
         const { data: todayCheckIns } = await supabase
           .from("checkins")
           .select("id")
-          .gte("checked_in_at", new Date().toISOString().split("T")[0])
+          .gte("check_in_time", new Date().toISOString().split("T")[0])
 
         const totalMembers = members?.length || 0
         const activeMembers = members?.filter((m) => m.status === "active").length || 0

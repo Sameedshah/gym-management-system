@@ -69,6 +69,12 @@ export function RecentCheckIns() {
                         <Badge variant="outline" className="text-xs">
                           ID: {checkin.member?.member_id}
                         </Badge>
+                        {checkin.member?.months_due && checkin.member.months_due > 0 && (
+                          <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            {checkin.member.months_due} Month{checkin.member.months_due > 1 ? 's' : ''} Due
+                          </Badge>
+                        )}
                         <Badge 
                           variant={checkin.entry_method === 'biometric' ? 'default' : 'secondary'}
                           className="text-xs"
