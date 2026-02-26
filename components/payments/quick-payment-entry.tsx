@@ -28,11 +28,113 @@ import {
 } from "lucide-react"
 import type { Member, Invoice } from "@/lib/types"
 
+// Receipt generation function
+const generateReceipt = (paymentData: {
+  receiptNumber: string
+  memberName: string
+  memberId: string
+  monthsPaid: number
+  totalAmount: number
+  paymentDate: string
+  description: string
+}) => {
+  const receiptHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Payment Receipt</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+    .header h1 { margin: 0; color: #333; }
+    .header p { margin: 5px 0; color: #666; }
+    .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
+    .receipt-info div { flex: 1; }
+    .receipt-info strong { display: block; color: #333; margin-bottom: 5px; }
+    .details-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    .details-table th, .details-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+    .details-table th { background-color: #f5f5f5; font-weight: bold; }
+    .total-row { font-weight: bold; font-size: 1.1em; background-color: #f9f9f9; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>GymAdmin</h1>
+    <p>Payment Receipt</p>
+  </div>
+  
+  <div class="receipt-info">
+    <div>
+      <strong>Receipt Number:</strong>
+      <span>${paymentData.receiptNumber}</span>
+    </div>
+    <div>
+      <strong>Payment Date:</strong>
+      <span>${new Date(paymentData.paymentDate).toLocaleDateString()}</span>
+    </div>
+  </div>
+  
+  <div class="receipt-info">
+    <div>
+      <strong>Member Name:</strong>
+      <span>${paymentData.memberName}</span>
+    </div>
+    <div>
+      <strong>Member ID:</strong>
+      <span>${paymentData.memberId}</span>
+    </div>
+  </div>
+  
+  <table class="details-table">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Months</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${paymentData.description || 'Membership Fee'}</td>
+        <td>${paymentData.monthsPaid} month(s)</td>
+        <td>Rs. ${paymentData.totalAmount.toLocaleString()}</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="2">Total Amount Paid</td>
+        <td>Rs. ${paymentData.totalAmount.toLocaleString()}</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <div class="footer">
+    <p>Thank you for your payment!</p>
+    <p>This is a computer-generated receipt and does not require a signature.</p>
+  </div>
+</body>
+</html>
+  `
+  
+  // Create a blob and download
+  const blob = new Blob([receiptHTML], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `Receipt-${paymentData.receiptNumber}.html`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export function QuickPaymentEntry() {
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [memberDues, setMemberDues] = useState<any[]>([])
   const [monthsPaid, setMonthsPaid] = useState("")
+  const [totalAmount, setTotalAmount] = useState("")
   const [description, setDescription] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -134,14 +236,21 @@ export function QuickPaymentEntry() {
   }
 
   const handlePayment = async () => {
-    if (!selectedMember || !monthsPaid) {
-      setError("Please select a member and enter months paid")
+    if (!selectedMember || !monthsPaid || !totalAmount) {
+      setError("Please select a member, enter months paid, and total amount")
       return
     }
 
     const monthsPayment = parseInt(monthsPaid)
+    const amountPaid = parseFloat(totalAmount)
+    
     if (isNaN(monthsPayment) || monthsPayment <= 0) {
       setError("Please enter a valid number of months")
+      return
+    }
+    
+    if (isNaN(amountPaid) || amountPaid <= 0) {
+      setError("Please enter a valid amount")
       return
     }
 
@@ -152,14 +261,21 @@ export function QuickPaymentEntry() {
     const supabase = createClient()
 
     try {
+      const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+      const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+      
       // Create payment record for months paid
       const paymentData = {
         member_id: selectedMember.id,
+        invoice_number: invoiceNumber,
         months_due: monthsPayment,
-        description: description || `Payment for ${monthsPayment} month(s)`,
+        description: description || `Payment for ${monthsPayment} month(s) - Rs. ${amountPaid}`,
         status: "paid" as const,
         paid_date: new Date().toISOString().split('T')[0],
-        due_date: new Date().toISOString().split('T')[0] // Set due date to today for paid invoices
+        due_date: new Date().toISOString().split('T')[0],
+        sms_sent: false,
+        email_sent: false,
+        reminder_count: 0,
       }
 
       console.log('Inserting payment data:', paymentData)
@@ -205,17 +321,29 @@ export function QuickPaymentEntry() {
         remainingMonthsToPay -= monthsToDeduct
       }
 
+      // Generate and download receipt
+      generateReceipt({
+        receiptNumber,
+        memberName: selectedMember.name,
+        memberId: selectedMember.member_id || 'N/A',
+        monthsPaid: monthsPayment,
+        totalAmount: amountPaid,
+        paymentDate: new Date().toISOString(),
+        description: description || 'Membership Fee'
+      })
+
       // Refresh member dues
       await fetchMemberDues()
 
       // Show success message
       setSuccess(
         `Payment recorded successfully! ` +
-        `Cleared ${monthsPayment} month(s) of dues for ${selectedMember.name}.`
+        `Cleared ${monthsPayment} month(s) of dues for ${selectedMember.name}. Receipt downloaded.`
       )
 
       // Reset form
       setMonthsPaid("")
+      setTotalAmount("")
       setDescription("")
 
     } catch (error) {
@@ -388,22 +516,36 @@ export function QuickPaymentEntry() {
         )}
 
         {/* Payment Form */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="monthsPaid">Months Paid *</Label>
-            <Input
-              id="monthsPaid"
-              type="number"
-              placeholder="1"
-              value={monthsPaid}
-              onChange={(e) => setMonthsPaid(e.target.value)}
-              min="1"
-              max="12"
-              step="1"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="monthsPaid">Months Paid *</Label>
+              <Input
+                id="monthsPaid"
+                type="number"
+                placeholder="1"
+                value={monthsPaid}
+                onChange={(e) => setMonthsPaid(e.target.value)}
+                min="1"
+                max="12"
+                step="1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="totalAmount">Total Amount (Rs.) *</Label>
+              <Input
+                id="totalAmount"
+                type="number"
+                placeholder="0"
+                value={totalAmount}
+                onChange={(e) => setTotalAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+            </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Description (Optional)</Label>
             <Input
               id="description"
               placeholder="Payment description"
@@ -414,17 +556,21 @@ export function QuickPaymentEntry() {
         </div>
 
         {/* Payment Summary */}
-        {selectedMember && monthsPaid && (
+        {selectedMember && monthsPaid && totalAmount && (
           <Alert>
             <CreditCard className="h-4 w-4" />
             <AlertDescription>
-              Recording payment of <strong>{monthsPaid} month(s)</strong> for{" "}
+              Recording payment of <strong>Rs. {parseFloat(totalAmount).toLocaleString()}</strong> for{" "}
+              <strong>{monthsPaid} month(s)</strong> from{" "}
               <strong>{selectedMember.name}</strong>
               {memberDues.length > 0 && (
                 <span className="block mt-1 text-sm">
                   This will automatically clear dues starting from oldest invoices.
                 </span>
               )}
+              <span className="block mt-1 text-sm font-medium">
+                Receipt will be auto-generated and downloaded.
+              </span>
             </AlertDescription>
           </Alert>
         )}
@@ -447,7 +593,7 @@ export function QuickPaymentEntry() {
         {/* Submit Button */}
         <Button 
           onClick={handlePayment} 
-          disabled={!selectedMember || !monthsPaid || isLoading}
+          disabled={!selectedMember || !monthsPaid || !totalAmount || isLoading}
           className="w-full"
         >
           {isLoading ? (
@@ -458,7 +604,7 @@ export function QuickPaymentEntry() {
           ) : (
             <>
               <CreditCard className="h-4 w-4 mr-2" />
-              Record Payment
+              Record Payment & Generate Receipt
             </>
           )}
         </Button>
