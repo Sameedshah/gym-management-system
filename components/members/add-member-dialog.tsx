@@ -66,12 +66,15 @@ export function AddMemberDialog() {
     // Create initial due invoice for the first month
     const today = new Date()
     const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    const invoiceMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
     
     const invoiceData = {
       member_id: newMember.id,
       invoice_number: invoiceNumber,
+      invoice_month: invoiceMonth,
       status: "due",
       months_due: 1,
+      amount: 0,
       due_date: today.toISOString().split("T")[0],
       description: "Initial membership fee - First month",
       sms_sent: false,

@@ -266,12 +266,18 @@ export function QuickPaymentEntry() {
       const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
       const invoiceNumber = `INV-${timestamp}-${randomStr}`
       
+      // Get current month for invoice_month field
+      const currentDate = new Date()
+      const invoiceMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`
+      
       console.log('Generated invoice number:', invoiceNumber)
+      console.log('Invoice month:', invoiceMonth)
       
       // Create payment record for months paid
       const paymentData = {
         member_id: selectedMember.id,
         invoice_number: invoiceNumber,
+        invoice_month: invoiceMonth,
         months_due: monthsPayment,
         amount: amountPaid,
         description: description || `Payment for ${monthsPayment} month(s) - Rs. ${amountPaid}`,

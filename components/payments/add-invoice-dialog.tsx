@@ -59,9 +59,14 @@ export function AddInvoiceDialog() {
     const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
     const invoiceNumber = `INV-${timestamp}-${randomStr}`
     
+    // Get current month for invoice_month field
+    const currentDate = new Date()
+    const invoiceMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`
+    
     const { error } = await supabase.from("invoices").insert({
       member_id: formData.member_id,
       invoice_number: invoiceNumber,
+      invoice_month: invoiceMonth,
       months_due: parseInt(formData.months_due),
       amount: 0,
       description: formData.description || `Invoice for ${formData.months_due} month(s)`,
