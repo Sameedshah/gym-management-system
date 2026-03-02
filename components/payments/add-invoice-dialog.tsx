@@ -53,12 +53,23 @@ export function AddInvoiceDialog() {
     setIsLoading(true)
 
     const supabase = createClient()
+    
+    // Generate unique invoice number
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
+    const invoiceNumber = `INV-${timestamp}-${randomStr}`
+    
     const { error } = await supabase.from("invoices").insert({
       member_id: formData.member_id,
+      invoice_number: invoiceNumber,
       months_due: parseInt(formData.months_due),
-      description: formData.description,
+      amount: 0,
+      description: formData.description || `Invoice for ${formData.months_due} month(s)`,
       due_date: formData.due_date,
       status: formData.status,
+      sms_sent: false,
+      email_sent: false,
+      reminder_count: 0,
     })
 
     if (!error) {
@@ -71,6 +82,9 @@ export function AddInvoiceDialog() {
         status: "due",
       })
       router.refresh()
+    } else {
+      console.error('Error creating invoice:', error)
+      alert(`Failed to create invoice: ${error.message}`)
     }
 
     setIsLoading(false)

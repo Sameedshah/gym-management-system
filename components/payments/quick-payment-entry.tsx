@@ -261,18 +261,24 @@ export function QuickPaymentEntry() {
     const supabase = createClient()
 
     try {
-      const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-      const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+      // Generate unique invoice number with timestamp to avoid collisions
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
+      const invoiceNumber = `INV-${timestamp}-${randomStr}`
+      
+      console.log('Generated invoice number:', invoiceNumber)
       
       // Create payment record for months paid
       const paymentData = {
         member_id: selectedMember.id,
         invoice_number: invoiceNumber,
         months_due: monthsPayment,
+        amount: amountPaid,
         description: description || `Payment for ${monthsPayment} month(s) - Rs. ${amountPaid}`,
         status: "paid" as const,
         paid_date: new Date().toISOString().split('T')[0],
         due_date: new Date().toISOString().split('T')[0],
+        payment_method: "cash",
         sms_sent: false,
         email_sent: false,
         reminder_count: 0,
@@ -288,7 +294,9 @@ export function QuickPaymentEntry() {
 
       if (paymentError) {
         console.error('Payment error details:', paymentError)
-        throw paymentError
+        setError(`Payment failed: ${paymentError.message || 'Unknown error'}`)
+        setIsLoading(false)
+        return
       }
 
       console.log('Payment recorded successfully:', paymentRecord)
@@ -323,7 +331,7 @@ export function QuickPaymentEntry() {
 
       // Generate and download receipt
       generateReceipt({
-        receiptNumber,
+        receiptNumber: invoiceNumber,
         memberName: selectedMember.name,
         memberId: selectedMember.member_id || 'N/A',
         monthsPaid: monthsPayment,
