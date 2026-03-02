@@ -65,7 +65,24 @@ export function AddMemberDialog() {
 
     // Create initial due invoice for the first month
     const today = new Date()
-    const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    
+    // Generate concise invoice number
+    const { data: lastInvoice } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    let invoiceNum = 1001
+    if (lastInvoice?.invoice_number) {
+      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
+      if (match) {
+        invoiceNum = parseInt(match[1]) + 1
+      }
+    }
+    
+    const invoiceNumber = `INV-${invoiceNum}`
     const invoiceMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
     
     const invoiceData = {

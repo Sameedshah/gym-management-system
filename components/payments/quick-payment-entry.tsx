@@ -47,7 +47,7 @@ const generateReceipt = (paymentData: {
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
     .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-    .header h1 { margin: 0; color: #333; }
+    .header h1 { margin: 0; color: #333; font-size: 2em; }
     .header p { margin: 5px 0; color: #666; }
     .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
     .receipt-info div { flex: 1; }
@@ -62,7 +62,7 @@ const generateReceipt = (paymentData: {
 </head>
 <body>
   <div class="header">
-    <h1>GymAdmin</h1>
+    <h1>SM Gym</h1>
     <p>Payment Receipt</p>
   </div>
   
@@ -112,6 +112,7 @@ const generateReceipt = (paymentData: {
   <div class="footer">
     <p>Thank you for your payment!</p>
     <p>This is a computer-generated receipt and does not require a signature.</p>
+    <p><strong>SM Gym</strong></p>
   </div>
 </body>
 </html>
@@ -261,10 +262,23 @@ export function QuickPaymentEntry() {
     const supabase = createClient()
 
     try {
-      // Generate unique invoice number with timestamp to avoid collisions
-      const timestamp = Date.now()
-      const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
-      const invoiceNumber = `INV-${timestamp}-${randomStr}`
+      // Generate concise invoice number (e.g., INV-1001, INV-1002)
+      const { data: lastInvoice } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      let invoiceNum = 1001
+      if (lastInvoice?.invoice_number) {
+        const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
+        if (match) {
+          invoiceNum = parseInt(match[1]) + 1
+        }
+      }
+      
+      const invoiceNumber = `INV-${invoiceNum}`
       
       // Get current month for invoice_month field
       const currentDate = new Date()

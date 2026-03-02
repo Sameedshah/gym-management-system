@@ -16,7 +16,7 @@ const generateReceipt = (invoice: Invoice & { member?: any }) => {
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
     .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-    .header h1 { margin: 0; color: #333; }
+    .header h1 { margin: 0; color: #333; font-size: 2em; }
     .header p { margin: 5px 0; color: #666; }
     .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
     .receipt-info div { flex: 1; }
@@ -31,7 +31,7 @@ const generateReceipt = (invoice: Invoice & { member?: any }) => {
 </head>
 <body>
   <div class="header">
-    <h1>GymAdmin</h1>
+    <h1>SM Gym</h1>
     <p>Payment Receipt</p>
   </div>
   
@@ -77,6 +77,7 @@ const generateReceipt = (invoice: Invoice & { member?: any }) => {
   <div class="footer">
     <p>Thank you for your payment!</p>
     <p>This is a computer-generated receipt and does not require a signature.</p>
+    <p><strong>SM Gym</strong></p>
   </div>
 </body>
 </html>

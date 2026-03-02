@@ -54,10 +54,23 @@ export function AddInvoiceDialog() {
 
     const supabase = createClient()
     
-    // Generate unique invoice number
-    const timestamp = Date.now()
-    const randomStr = Math.random().toString(36).substring(2, 11).toUpperCase()
-    const invoiceNumber = `INV-${timestamp}-${randomStr}`
+    // Generate concise invoice number (e.g., INV-1001, INV-1002)
+    const { data: lastInvoice } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    let invoiceNum = 1001
+    if (lastInvoice?.invoice_number) {
+      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
+      if (match) {
+        invoiceNum = parseInt(match[1]) + 1
+      }
+    }
+    
+    const invoiceNumber = `INV-${invoiceNum}`
     
     // Get current month for invoice_month field
     const currentDate = new Date()
