@@ -121,7 +121,7 @@ export function AddMemberDialog() {
     setError(null)
   }
 
-  const canProceedToReview = formData.name && formData.father_name && formData.email
+  const canProceedToReview = formData.name && formData.father_name
 
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
@@ -177,14 +177,13 @@ export function AddMemberDialog() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email">Email (Optional)</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="member@example.com"
-                  required
                 />
               </div>
 
@@ -250,7 +249,7 @@ export function AddMemberDialog() {
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Email</Label>
-                    <p className="font-medium">{formData.email}</p>
+                    <p className="font-medium">{formData.email || "Not provided"}</p>
                   </div>
                   <div>
                     <Label className="text-sm text-muted-foreground">Plan</Label>
