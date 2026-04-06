@@ -218,8 +218,9 @@ export function QuickPaymentEntry() {
       const totalMonthsDue = dueInvoices?.reduce((sum, invoice) => sum + (invoice.months_due || 1), 0) || 0
       
       // Create a simplified dues structure
-      const dueMonths = dueInvoices?.map((invoice, index) => ({
+      const dueMonths = dueInvoices?.map((invoice) => ({
         invoiceId: invoice.id,
+        invoiceNumber: invoice.invoice_number || '',
         monthsDue: invoice.months_due || 1,
         dueDate: invoice.due_date,
         status: 'due'
@@ -236,6 +237,23 @@ export function QuickPaymentEntry() {
     return memberDues.reduce((sum, due) => sum + due.monthsDue, 0)
   }
 
+  // Helper: generate next invoice number
+  const getNextInvoiceNumber = async (supabase: ReturnType<typeof createClient>): Promise<string> => {
+    const { data: lastInvoice } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    let invoiceNum = 1001
+    if (lastInvoice?.invoice_number) {
+      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
+      if (match) invoiceNum = parseInt(match[1]) + 1
+    }
+    return `INV-${invoiceNum}`
+  }
+
   const handlePayment = async () => {
     if (!selectedMember || !monthsPaid || !totalAmount) {
       setError("Please select a member, enter months paid, and total amount")
@@ -244,12 +262,12 @@ export function QuickPaymentEntry() {
 
     const monthsPayment = parseInt(monthsPaid)
     const amountPaid = parseFloat(totalAmount)
-    
+
     if (isNaN(monthsPayment) || monthsPayment <= 0) {
       setError("Please enter a valid number of months")
       return
     }
-    
+
     if (isNaN(amountPaid) || amountPaid <= 0) {
       setError("Please enter a valid amount")
       return
@@ -260,98 +278,101 @@ export function QuickPaymentEntry() {
     setSuccess(null)
 
     const supabase = createClient()
+    const today = new Date().toISOString().split('T')[0]
+    const currentDate = new Date()
+    const invoiceMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`
 
     try {
-      // Generate concise invoice number (e.g., INV-1001, INV-1002)
-      const { data: lastInvoice } = await supabase
-        .from('invoices')
-        .select('invoice_number')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      
-      let invoiceNum = 1001
-      if (lastInvoice?.invoice_number) {
-        const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-        if (match) {
-          invoiceNum = parseInt(match[1]) + 1
-        }
-      }
-      
-      const invoiceNumber = `INV-${invoiceNum}`
-      
-      // Get current month for invoice_month field
-      const currentDate = new Date()
-      const invoiceMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`
-      
-      console.log('Generated invoice number:', invoiceNumber)
-      console.log('Invoice month:', invoiceMonth)
-      
-      // Create payment record for months paid
-      const paymentData = {
-        member_id: selectedMember.id,
-        invoice_number: invoiceNumber,
-        invoice_month: invoiceMonth,
-        months_due: monthsPayment,
-        amount: amountPaid,
-        description: description || `Payment for ${monthsPayment} month(s) - Rs. ${amountPaid}`,
-        status: "paid" as const,
-        paid_date: new Date().toISOString().split('T')[0],
-        due_date: new Date().toISOString().split('T')[0],
-        payment_method: "cash",
-        sms_sent: false,
-        email_sent: false,
-        reminder_count: 0,
-      }
-
-      console.log('Inserting payment data:', paymentData)
-
-      const { data: paymentRecord, error: paymentError } = await supabase
-        .from("invoices")
-        .insert(paymentData)
-        .select()
-        .single()
-
-      if (paymentError) {
-        console.error('Payment error details:', paymentError)
-        setError(`Payment failed: ${paymentError.message || 'Unknown error'}`)
-        setIsLoading(false)
-        return
-      }
-
-      console.log('Payment recorded successfully:', paymentRecord)
-
-      // Update existing due invoices to reduce months due
       let remainingMonthsToPay = monthsPayment
+      let receiptInvoiceNumber: string | null = null
+      let amountAssigned = false
+
+      // Process existing due invoices by UPDATING them (no duplicate creation)
       for (const due of memberDues) {
         if (remainingMonthsToPay <= 0) break
-        
+
         const monthsToDeduct = Math.min(remainingMonthsToPay, due.monthsDue)
         const newMonthsDue = due.monthsDue - monthsToDeduct
-        
+
         if (newMonthsDue <= 0) {
-          // Mark invoice as paid
-          await supabase
+          // Fully clear this due invoice — update it to paid
+          const updateData: Record<string, unknown> = {
+            status: "paid",
+            paid_date: today,
+            payment_method: "cash",
+          }
+          // Assign full amount and description to the first invoice cleared
+          if (!amountAssigned) {
+            updateData.amount = amountPaid
+            updateData.description = description || `Payment for ${monthsPayment} month(s) - Rs. ${amountPaid}`
+            amountAssigned = true
+          }
+          const { error: updateError } = await supabase
             .from("invoices")
-            .update({ 
-              status: "paid", 
-              paid_date: new Date().toISOString().split('T')[0] 
-            })
+            .update(updateData)
             .eq("id", due.invoiceId)
+          if (updateError) throw updateError
+
+          if (!receiptInvoiceNumber) receiptInvoiceNumber = due.invoiceNumber
         } else {
-          // Reduce months due
-          await supabase
+          // Partial payment: reduce months_due on existing invoice, create a paid record
+          const { error: reduceError } = await supabase
             .from("invoices")
             .update({ months_due: newMonthsDue })
             .eq("id", due.invoiceId)
+          if (reduceError) throw reduceError
+
+          const partialInvNumber = await getNextInvoiceNumber(supabase)
+          const { error: insertError } = await supabase.from("invoices").insert({
+            member_id: selectedMember.id,
+            invoice_number: partialInvNumber,
+            invoice_month: invoiceMonth,
+            months_due: monthsToDeduct,
+            amount: amountPaid,
+            description: description || `Partial payment - ${monthsToDeduct} month(s) - Rs. ${amountPaid}`,
+            status: "paid",
+            paid_date: today,
+            due_date: today,
+            payment_method: "cash",
+            sms_sent: false,
+            email_sent: false,
+            reminder_count: 0,
+          })
+          if (insertError) throw insertError
+
+          if (!receiptInvoiceNumber) receiptInvoiceNumber = partialInvNumber
+          amountAssigned = true
         }
-        
+
         remainingMonthsToPay -= monthsToDeduct
       }
 
-      // Generate and download receipt
+      // Advance payment: more months paid than what was due, or no dues at all
+      if (remainingMonthsToPay > 0) {
+        const advanceInvNumber = await getNextInvoiceNumber(supabase)
+        if (!receiptInvoiceNumber) receiptInvoiceNumber = advanceInvNumber
+
+        const { error: advanceError } = await supabase.from("invoices").insert({
+          member_id: selectedMember.id,
+          invoice_number: advanceInvNumber,
+          invoice_month: invoiceMonth,
+          months_due: remainingMonthsToPay,
+          amount: amountAssigned ? 0 : amountPaid,
+          description: description || `Payment - ${remainingMonthsToPay} month(s) - Rs. ${amountPaid}`,
+          status: "paid",
+          paid_date: today,
+          due_date: today,
+          payment_method: "cash",
+          sms_sent: false,
+          email_sent: false,
+          reminder_count: 0,
+        })
+        if (advanceError) throw advanceError
+      }
+
+      // Generate and download receipt using the invoice number from first cleared/created invoice
       generateReceipt({
-        receiptNumber: invoiceNumber,
+        receiptNumber: receiptInvoiceNumber || 'N/A',
         memberName: selectedMember.name,
         memberId: selectedMember.member_id || 'N/A',
         monthsPaid: monthsPayment,
@@ -363,13 +384,11 @@ export function QuickPaymentEntry() {
       // Refresh member dues
       await fetchMemberDues()
 
-      // Show success message
       setSuccess(
         `Payment recorded successfully! ` +
         `Cleared ${monthsPayment} month(s) of dues for ${selectedMember.name}. Receipt downloaded.`
       )
 
-      // Reset form
       setMonthsPaid("")
       setTotalAmount("")
       setDescription("")

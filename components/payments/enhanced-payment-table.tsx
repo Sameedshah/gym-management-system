@@ -124,12 +124,16 @@ export function EnhancedPaymentTable({
     const totalPaidMonths = monthInvoices
       .filter((inv) => inv.status === "paid")
       .reduce((sum, inv) => sum + (inv.months_due || 1), 0);
+    const totalPaidAmount = monthInvoices
+      .filter((inv) => inv.status === "paid")
+      .reduce((sum, inv) => sum + (inv.amount || 0), 0);
 
     return {
       totalInvoices: monthInvoices.length,
       totalPayments,
       totalDueMonths,
       totalPaidMonths,
+      totalPaidAmount,
       paidCount: monthInvoices.filter((inv) => inv.status === "paid").length,
       dueCount: monthInvoices.filter((inv) => inv.status === "due").length,
     };
@@ -315,16 +319,18 @@ export function EnhancedPaymentTable({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-success/10 rounded-lg border border-success/20">
               <div className="text-2xl font-bold text-success">
-                {monthlyStats.totalPaidMonths}
+                Rs. {monthlyStats.totalPaidAmount.toLocaleString()}
               </div>
+              <div className="text-sm text-muted-foreground">Total Collected</div>
               <div className="text-xs text-muted-foreground mt-1">
-                {monthlyStats.paidCount} payments received
+                {monthlyStats.paidCount} payments · {monthlyStats.totalPaidMonths} months
               </div>
             </div>
             <div className="text-center p-4 bg-warning/10 rounded-lg border border-warning/20">
               <div className="text-2xl font-bold text-warning">
                 {monthlyStats.totalDueMonths}
               </div>
+              <div className="text-sm text-muted-foreground">Months Due</div>
               <div className="text-xs text-muted-foreground mt-1">
                 {monthlyStats.dueCount} members pending
               </div>
@@ -390,6 +396,7 @@ export function EnhancedPaymentTable({
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Member</TableHead>
                       <TableHead>Months</TableHead>
+                      <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Description</TableHead>
@@ -422,6 +429,11 @@ export function EnhancedPaymentTable({
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Membership period
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {invoice.amount ? `Rs. ${invoice.amount.toLocaleString()}` : '-'}
                           </div>
                         </TableCell>
                         <TableCell>

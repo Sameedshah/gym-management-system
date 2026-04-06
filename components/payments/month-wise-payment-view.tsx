@@ -58,6 +58,7 @@ interface MonthlyGroup {
   dueCount: number;
   totalPaidMonths: number;
   totalDueMonths: number;
+  totalPaidAmount: number;
 }
 
 export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: MonthWisePaymentViewProps) {
@@ -145,6 +146,7 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
           dueCount: 0,
           totalPaidMonths: 0,
           totalDueMonths: 0,
+          totalPaidAmount: 0,
         });
       }
 
@@ -155,6 +157,7 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
       if (invoice.status === "paid") {
         group.paidCount++;
         group.totalPaidMonths += invoice.months_due || 1;
+        group.totalPaidAmount += invoice.amount || 0;
       } else if (invoice.status === "due") {
         group.dueCount++;
         group.totalDueMonths += invoice.months_due || 1;
@@ -214,8 +217,8 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
   // Export data as CSV
   const exportToCSV = () => {
     const csvData = [];
-    csvData.push(['Month', 'Date', 'Member Name', 'Member ID', 'Months', 'Status', 'Description']);
-    
+    csvData.push(['Month', 'Date', 'Member Name', 'Member ID', 'Months', 'Amount (Rs.)', 'Status', 'Description']);
+
     monthlyGroups.forEach((group) => {
       group.invoices.forEach((invoice) => {
         csvData.push([
@@ -224,6 +227,7 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
           invoice.member?.name || 'Unknown Member',
           invoice.member?.member_id || 'N/A',
           invoice.months_due || 1,
+          invoice.amount || 0,
           invoice.status,
           invoice.description || (invoice.status === 'paid' ? 'Payment received' : 'Monthly dues')
         ]);
@@ -366,14 +370,14 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
 
           {/* Summary Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
-              <div className="text-2xl font-bold text-primary">
-                {monthlyGroups.length}
-              </div>
-              <div className="text-sm text-muted-foreground">Active Months</div>
-            </div>
             <div className="text-center p-4 bg-success/10 rounded-lg border border-success/20">
               <div className="text-2xl font-bold text-success">
+                Rs. {monthlyGroups.reduce((sum, group) => sum + group.totalPaidAmount, 0).toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground">Total Collected</div>
+            </div>
+            <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="text-2xl font-bold text-primary">
                 {monthlyGroups.reduce((sum, group) => sum + group.totalPaidMonths, 0)}
               </div>
               <div className="text-sm text-muted-foreground">Months Paid</div>
@@ -431,18 +435,18 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <div className="text-sm font-medium text-success">
-                            {group.totalPaidMonths} months paid
+                          <div className="text-sm font-bold text-success">
+                            Rs. {group.totalPaidAmount.toLocaleString()}
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {group.paidCount} payments
+                          <div className="text-xs text-muted-foreground">
+                            {group.totalPaidMonths} months · {group.paidCount} payments
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-medium text-warning">
                             {group.totalDueMonths} months due
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs text-muted-foreground">
                             {group.dueCount} pending
                           </div>
                         </div>
@@ -459,6 +463,7 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
                             <TableHead>Date</TableHead>
                             <TableHead>Member</TableHead>
                             <TableHead>Months</TableHead>
+                            <TableHead>Amount</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Description</TableHead>
                           </TableRow>
@@ -490,6 +495,11 @@ export function MonthWisePaymentView({ invoices: propInvoices, onRefresh }: Mont
                                 <TableCell>
                                   <div className="font-medium">
                                     {invoice.months_due || 1} month(s)
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-medium">
+                                    {invoice.amount ? `Rs. ${invoice.amount.toLocaleString()}` : '-'}
                                   </div>
                                 </TableCell>
                                 <TableCell>

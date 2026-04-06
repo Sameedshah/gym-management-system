@@ -29,7 +29,10 @@ export interface Invoice {
   email_sent: boolean
   last_reminder_sent?: string
   reminder_count: number
-  months_due: number // How many months fees is due (no amounts)
+  months_due: number // How many months fees is due
+  amount?: number // Amount paid in Rs.
+  invoice_month?: string // YYYY-MM-01 format for monthly grouping
+  payment_method?: string // cash, card, etc.
   created_at: string
   updated_at: string
   member?: Member

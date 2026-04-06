@@ -95,8 +95,9 @@ export function AdminOverview() {
       const dailyPaymentsSummary = todayPayments.reduce((acc, payment) => {
         acc.totalMonths += (payment.months_due || 1)
         acc.count += 1
+        acc.totalAmount += (payment.amount || 0)
         return acc
-      }, { totalMonths: 0, count: 0 })
+      }, { totalMonths: 0, count: 0, totalAmount: 0 })
 
       // Monthly payments summary
       const monthlyPaymentsSummary = monthlyPayments.reduce((acc, payment) => {
@@ -113,6 +114,7 @@ export function AdminOverview() {
         membersWithDues: membersWithDuesArray.length,
         dailyMonthsPaid: dailyPaymentsSummary.totalMonths,
         dailyPaymentCount: dailyPaymentsSummary.count,
+        dailyPaymentAmount: dailyPaymentsSummary.totalAmount,
         monthlyMonthsPaid: monthlyPaymentsSummary.totalMonths,
         monthlyPaymentCount: monthlyPaymentsSummary.count
       })
@@ -159,10 +161,10 @@ export function AdminOverview() {
               <div className="text-sm text-muted-foreground">Today's Payments</div>
             </div>
             <div className="text-2xl font-bold text-success">
-              {stats?.dailyMonthsPaid || 0}
+              Rs. {(stats?.dailyPaymentAmount || 0).toLocaleString()}
             </div>
             <div className="text-xs text-muted-foreground">
-              months paid ({stats?.dailyPaymentCount} payments)
+              {stats?.dailyMonthsPaid || 0} months · {stats?.dailyPaymentCount || 0} payments
             </div>
           </CardContent>
         </Card>
