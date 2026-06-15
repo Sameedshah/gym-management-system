@@ -40,13 +40,13 @@ export function DuesMembersList() {
       // Get all members
       const { data: members } = await supabase
         .from("members")
-        .select("*")
+        .select("id, name, email, member_id, plan_name, status")
         .eq("status", "active")
 
       // Get all due invoices
       const { data: dueInvoices } = await supabase
         .from("invoices")
-        .select("*")
+        .select("id, member_id, months_due, last_reminder_sent")
         .eq("status", "due")
 
       if (members && dueInvoices) {

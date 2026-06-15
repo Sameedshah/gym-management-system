@@ -44,7 +44,7 @@ export function DeletePaymentDialog({
         // Check if there are any related due invoices that might be affected
         const { data: relatedInvoices, error: checkError } = await supabase
           .from("invoices")
-          .select("*")
+          .select("id")
           .eq("member_id", invoice.member_id)
           .eq("status", "due")
           .order("created_at", { ascending: true })

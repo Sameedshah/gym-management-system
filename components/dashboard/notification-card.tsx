@@ -33,7 +33,7 @@ export function NotificationCard() {
           console.log("[v0] New check-in received:", payload)
 
           // Fetch member details and fee status
-          const { data: member } = await supabase.from("members").select("*").eq("id", payload.new.member_id).single()
+          const { data: member } = await supabase.from("members").select("id, name").eq("id", payload.new.member_id).single()
 
           if (member) {
             // Get latest invoice to determine fee status

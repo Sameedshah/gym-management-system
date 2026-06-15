@@ -176,7 +176,7 @@ export function QuickPaymentEntry() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("members")
-        .select("*")
+        .select("id, name, member_id, email")
         .eq("status", "active")
         .order("name")
       
@@ -203,7 +203,7 @@ export function QuickPaymentEntry() {
       // Get existing due invoices for this member
       const { data: dueInvoices, error: invoiceError } = await supabase
         .from("invoices")
-        .select("*")
+        .select("id, invoice_number, months_due, due_date")
         .eq("member_id", selectedMember.id)
         .eq("status", "due")
         .order("created_at", { ascending: true })

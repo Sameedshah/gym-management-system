@@ -35,7 +35,7 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
     try {
       const { data } = await supabase
         .from("invoices")
-        .select("*")
+        .select("id, status, months_due, due_date")
         .eq("member_id", member.id)
         .order("created_at", { ascending: false })
 

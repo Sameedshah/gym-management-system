@@ -65,11 +65,11 @@ export function AdminOverview() {
         todayPaymentsResult,
         monthlyPaymentsResult
       ] = await Promise.all([
-        supabase.from("members").select("*"),
-        supabase.from("invoices").select("*, member:members(*)")
+        supabase.from("members").select("id, status, member_id, name, email, last_seen"),
+        supabase.from("invoices").select("id, invoice_number, months_due, amount, paid_date, description, member:members(id, name, member_id)")
           .eq("status", "paid")
           .gte("paid_date", new Date().toISOString().split('T')[0]),
-        supabase.from("invoices").select("*, member:members(*)")
+        supabase.from("invoices").select("id, months_due, amount, paid_date, member:members(id, name, member_id)")
           .eq("status", "paid")
           .gte("paid_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
       ])
@@ -87,7 +87,7 @@ export function AdminOverview() {
       // Get members with dues (consolidated dues and overdues into single "due" status)
       const dueInvoicesResult = await supabase
         .from("invoices")
-        .select("*, member:members(*)")
+        .select("id, member_id, months_due, member:members(id, name, member_id)")
         .eq("status", "due")
 
       const dueInvoices = dueInvoicesResult.data || []

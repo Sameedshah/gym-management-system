@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { RealtimeChannel } from '@supabase/supabase-js'
+
+const POLL_INTERVAL_MS = 2 * 60 * 1000 // 2 minutes
 
 interface CheckinData {
   id: string
@@ -27,94 +28,14 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
   const [recentCheckins, setRecentCheckins] = useState<CheckinData[]>([])
   const [todayCount, setTodayCount] = useState(0)
   const [isConnected, setIsConnected] = useState(false)
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null)
 
-  useEffect(() => {
+  const fetchTodayCheckins = async () => {
     const supabase = createClient()
-    
-    // Load initial data
-    loadInitialData()
-    
-    // Set up real-time subscription
-    const checkinChannel = supabase
-      .channel('checkins-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'checkins'
-        },
-        async (payload) => {
-          console.log('🔔 New check-in received:', payload)
-          
-          // Get member details for the new check-in
-          const { data: memberData } = await supabase
-            .from('members')
-            .select('name, member_id')
-            .eq('id', payload.new.member_id)
-            .single()
-          
-          // Get overdue invoices count
-          const { data: overdueInvoices } = await supabase
-            .from('invoices')
-            .select('months_due')
-            .eq('member_id', payload.new.member_id)
-            .eq('status', 'due')
-          
-          const totalMonthsDue = overdueInvoices?.reduce((sum, inv) => sum + (inv.months_due || 0), 0) || 0
-          
-          const newCheckin: CheckinData = {
-            ...payload.new as CheckinData,
-            member: memberData ? {
-              ...memberData,
-              months_due: totalMonthsDue
-            } : undefined
-          }
-          
-          // Add to recent check-ins (keep only last 10)
-          setRecentCheckins(prev => [newCheckin, ...prev.slice(0, 9)])
-          
-          // Update today's count if it's today
-          const checkinDate = new Date(payload.new.check_in_time)
-          const today = new Date()
-          if (checkinDate.toDateString() === today.toDateString()) {
-            setTodayCount(prev => prev + 1)
-          }
-          
-          // Show notification (optional)
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('New Check-in', {
-              body: `${memberData?.name || 'Member'} checked in`,
-              icon: '/favicon.ico'
-            })
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status)
-        setIsConnected(status === 'SUBSCRIBED')
-      })
-    
-    setChannel(checkinChannel)
-    
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-    
-    return () => {
-      if (checkinChannel) {
-        supabase.removeChannel(checkinChannel)
-      }
-    }
-  }, [])
 
-  const loadInitialData = async () => {
-    const supabase = createClient()
-    
     try {
-      // Load recent check-ins with member details
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+
       const { data: checkins } = await supabase
         .from('checkins')
         .select(`
@@ -128,24 +49,23 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
             member_id
           )
         `)
+        .gte('check_in_time', startOfToday.toISOString())
         .order('check_in_time', { ascending: false })
         .limit(10)
-      
+
       if (checkins) {
-        // Fetch overdue invoices for all members
         const memberIds = checkins.map(c => c.member_id).filter(Boolean)
         const { data: overdueInvoices } = await supabase
           .from('invoices')
           .select('member_id, months_due')
           .in('member_id', memberIds)
           .eq('status', 'due')
-        
-        // Calculate total months due per member
+
         const monthsDueByMember = overdueInvoices?.reduce((acc, inv) => {
           acc[inv.member_id] = (acc[inv.member_id] || 0) + (inv.months_due || 0)
           return acc
         }, {} as Record<string, number>) || {}
-        
+
         const formattedCheckins = checkins.map(checkin => ({
           ...checkin,
           member: checkin.members ? {
@@ -154,24 +74,46 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
             months_due: monthsDueByMember[checkin.member_id] || 0
           } : undefined
         }))
+
         setRecentCheckins(formattedCheckins)
+        setTodayCount(formattedCheckins.length)
       }
-      
-      // Load today's count
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      const { data: todayCheckins } = await supabase
-        .from('checkins')
-        .select('id')
-        .gte('check_in_time', today.toISOString())
-      
-      setTodayCount(todayCheckins?.length || 0)
-      
+
+      setIsConnected(true)
     } catch (error) {
-      console.error('Failed to load initial checkin data:', error)
+      console.error('Failed to fetch checkins:', error)
+      setIsConnected(false)
     }
   }
+
+  useEffect(() => {
+    // Initial fetch
+    fetchTodayCheckins()
+
+    // Poll every 2 minutes
+    const pollInterval = setInterval(fetchTodayCheckins, POLL_INTERVAL_MS)
+
+    // Reset at midnight
+    const scheduleMidnightReset = () => {
+      const midnight = new Date()
+      midnight.setHours(24, 0, 0, 0)
+      const msUntilMidnight = midnight.getTime() - Date.now()
+
+      return setTimeout(() => {
+        setRecentCheckins([])
+        setTodayCount(0)
+        fetchTodayCheckins()
+        midnightTimer = scheduleMidnightReset()
+      }, msUntilMidnight)
+    }
+
+    let midnightTimer = scheduleMidnightReset()
+
+    return () => {
+      clearInterval(pollInterval)
+      clearTimeout(midnightTimer)
+    }
+  }, [])
 
   return {
     recentCheckins,

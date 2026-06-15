@@ -42,7 +42,7 @@ export function AddInvoiceDialog() {
 
   const fetchMembers = async () => {
     const supabase = createClient()
-    const { data } = await supabase.from("members").select("*").eq("status", "active").order("name")
+    const { data } = await supabase.from("members").select("id, name").eq("status", "active").order("name")
     if (data) {
       setMembers(data)
     }
