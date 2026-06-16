@@ -24,7 +24,7 @@ export default function MembersPage() {
         console.log('Fetching members...')
         const { data, error } = await supabase
           .from("members")
-          .select("id, member_id, name, father_name, email, phone, plan_name, status, join_date, last_seen, fee_amount, biometric_enrolled, biometric_id, created_at")
+          .select("id, member_id, name, father_name, email, phone, plan_name, status, join_date, last_seen, monthly_fee, biometric_enrolled, biometric_id, created_at")
           .order("created_at", { ascending: false })
         
         console.log('Members fetch result:', { 
