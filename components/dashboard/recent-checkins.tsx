@@ -8,6 +8,7 @@ import { Loading } from "@/components/ui/loading"
 import { MemberDemographicsDialog } from "@/components/members/member-demographics-dialog"
 import { useRealtimeCheckins } from "@/hooks/use-realtime-checkins"
 import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import type { Member } from "@/lib/types"
 
 export function RecentCheckIns() {
@@ -15,9 +16,17 @@ export function RecentCheckIns() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [showDemographics, setShowDemographics] = useState(false)
 
-  const handleMemberClick = (member: Member) => {
-    setSelectedMember(member)
-    setShowDemographics(true)
+  const handleMemberClick = async (memberUuid: string) => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("members")
+      .select("*")
+      .eq("id", memberUuid)
+      .single()
+    if (data) {
+      setSelectedMember(data)
+      setShowDemographics(true)
+    }
   }
 
   const formatTime = (dateString: string) => {
@@ -96,10 +105,10 @@ export function RecentCheckIns() {
                       </p>
                     </div>
                     {checkin.member && (
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleMemberClick(checkin.member)}
+                        onClick={() => handleMemberClick(checkin.member_id)}
                       >
                         View
                       </Button>
