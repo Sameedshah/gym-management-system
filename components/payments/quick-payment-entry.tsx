@@ -237,23 +237,6 @@ export function QuickPaymentEntry() {
     return memberDues.reduce((sum, due) => sum + due.monthsDue, 0)
   }
 
-  // Helper: generate next invoice number
-  const getNextInvoiceNumber = async (supabase: ReturnType<typeof createClient>): Promise<string> => {
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    let invoiceNum = 1001
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) invoiceNum = parseInt(match[1]) + 1
-    }
-    return `INV-${invoiceNum}`
-  }
-
   const handlePayment = async () => {
     if (!selectedMember || !monthsPaid || !totalAmount) {
       setError("Please select a member, enter months paid, and total amount")
@@ -322,25 +305,27 @@ export function QuickPaymentEntry() {
             .eq("id", due.invoiceId)
           if (reduceError) throw reduceError
 
-          const partialInvNumber = await getNextInvoiceNumber(supabase)
-          const { error: insertError } = await supabase.from("invoices").insert({
-            member_id: selectedMember.id,
-            invoice_number: partialInvNumber,
-            invoice_month: invoiceMonth,
-            months_due: monthsToDeduct,
-            amount: amountPaid,
-            description: description || `Partial payment - ${monthsToDeduct} month(s) - Rs. ${amountPaid}`,
-            status: "paid",
-            paid_date: today,
-            due_date: today,
-            payment_method: "cash",
-            sms_sent: false,
-            email_sent: false,
-            reminder_count: 0,
-          })
+          const { data: partialInvoice, error: insertError } = await supabase
+            .from("invoices")
+            .insert({
+              member_id: selectedMember.id,
+              invoice_month: invoiceMonth,
+              months_due: monthsToDeduct,
+              amount: amountPaid,
+              description: description || `Partial payment - ${monthsToDeduct} month(s) - Rs. ${amountPaid}`,
+              status: "paid",
+              paid_date: today,
+              due_date: today,
+              payment_method: "cash",
+              sms_sent: false,
+              email_sent: false,
+              reminder_count: 0,
+            })
+            .select("invoice_number")
+            .single()
           if (insertError) throw insertError
 
-          if (!receiptInvoiceNumber) receiptInvoiceNumber = partialInvNumber
+          if (!receiptInvoiceNumber) receiptInvoiceNumber = partialInvoice.invoice_number
           amountAssigned = true
         }
 
@@ -348,7 +333,9 @@ export function QuickPaymentEntry() {
       }
 
       // Advance payment: create one paid invoice per month so the cron won't
-      // re-generate "due" invoices for months that are already paid
+      // re-generate "due" invoices for months that are already paid.
+      // invoice_number is left unset — the DB trigger assigns a
+      // collision-safe number to each row independently.
       if (remainingMonthsToPay > 0) {
         const advanceInvoices = []
         for (let i = 0; i < remainingMonthsToPay; i++) {
@@ -356,12 +343,8 @@ export function QuickPaymentEntry() {
           monthDate.setMonth(monthDate.getMonth() + i)
           const monthStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
 
-          const invNum = await getNextInvoiceNumber(supabase)
-          if (i === 0 && !receiptInvoiceNumber) receiptInvoiceNumber = invNum
-
           advanceInvoices.push({
             member_id: selectedMember.id,
-            invoice_number: invNum,
             invoice_month: monthStr,
             months_due: 1,
             amount: i === 0 && !amountAssigned ? amountPaid : 0,
@@ -376,8 +359,15 @@ export function QuickPaymentEntry() {
           })
         }
 
-        const { error: advanceError } = await supabase.from("invoices").insert(advanceInvoices)
+        const { data: insertedAdvance, error: advanceError } = await supabase
+          .from("invoices")
+          .insert(advanceInvoices)
+          .select("invoice_number")
         if (advanceError) throw advanceError
+
+        if (!receiptInvoiceNumber && insertedAdvance?.length) {
+          receiptInvoiceNumber = insertedAdvance[0].invoice_number
+        }
       }
 
       // Generate and download receipt using the invoice number from first cleared/created invoice

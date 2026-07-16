@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,16 +19,21 @@ interface MemberDemographicsDialogProps {
 export function MemberDemographicsDialog({ member, onClose }: MemberDemographicsDialogProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(false)
+  const requestedMemberIdRef = useRef<string | null>(null)
 
   useEffect(() => {
+    // Clear immediately so a fast member switch never shows stale data,
+    // and record which member this fetch is for so a slower, older
+    // request can't overwrite a newer one's result if they resolve out
+    // of order.
+    setInvoices([])
     if (member) {
-      fetchMemberInvoices()
+      fetchMemberInvoices(member.id)
     }
   }, [member])
 
-  const fetchMemberInvoices = async () => {
-    if (!member) return
-    
+  const fetchMemberInvoices = async (memberId: string) => {
+    requestedMemberIdRef.current = memberId
     setLoading(true)
     const supabase = createClient()
 
@@ -36,14 +41,18 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
       const { data } = await supabase
         .from("invoices")
         .select("id, status, months_due, due_date")
-        .eq("member_id", member.id)
+        .eq("member_id", memberId)
         .order("created_at", { ascending: false })
 
-      setInvoices(data || [])
+      if (requestedMemberIdRef.current === memberId) {
+        setInvoices(data || [])
+      }
     } catch (error) {
       console.error('Error fetching member invoices:', error)
     } finally {
-      setLoading(false)
+      if (requestedMemberIdRef.current === memberId) {
+        setLoading(false)
+      }
     }
   }
 
@@ -52,7 +61,9 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
   const dueInvoices = invoices.filter(invoice => invoice.status === 'due')
   const totalMonthsDue = dueInvoices.reduce((sum, invoice) => sum + (invoice.months_due || 0), 0)
   const lastSeen = member.last_seen ? new Date(member.last_seen) : null
-  const daysSinceLastSeen = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / (1000 * 60 * 60 * 24)) : null
+  const daysSinceLastSeen = lastSeen
+    ? Math.max(0, Math.floor((Date.now() - lastSeen.getTime()) / (1000 * 60 * 60 * 24)))
+    : null
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -115,7 +126,7 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
                 </div>
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Joined: {member.join_date ? new Date(member.join_date).toLocaleDateString() : <span className="text-muted-foreground italic">Invalid Date</span>}</span>
+                  <span>Joined: {member.join_date ? new Date(member.join_date).toLocaleDateString() : <span className="text-muted-foreground italic">Not provided</span>}</span>
                 </div>
                 {member.biometric_id && (
                   <div className="flex items-center gap-3">
@@ -181,7 +192,7 @@ export function MemberDemographicsDialog({ member, onClose }: MemberDemographics
               <CardTitle className="text-lg flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
                 Payment Information
-                {dueInvoices.length > 0 && (
+                {totalMonthsDue > 0 && (
                   <Badge variant="destructive" className="ml-2">
                     {totalMonthsDue} Month{totalMonthsDue > 1 ? 's' : ''} Due
                   </Badge>

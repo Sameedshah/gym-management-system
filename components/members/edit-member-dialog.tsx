@@ -23,7 +23,7 @@ export function EditMemberDialog({ member, onClose, onUpdate }: EditMemberDialog
   const [formData, setFormData] = useState({
     name: member.name,
     father_name: member.father_name,
-    email: member.email,
+    email: member.email || "",
     phone: member.phone || "",
     plan_name: member.plan_name,
     status: member.status,
@@ -38,6 +38,7 @@ export function EditMemberDialog({ member, onClose, onUpdate }: EditMemberDialog
       .from("members")
       .update({
         ...formData,
+        email: formData.email.trim() || null,
         membership_type: "standard", // Always set to standard
         updated_at: new Date().toISOString(),
       })
@@ -82,13 +83,12 @@ export function EditMemberDialog({ member, onClose, onUpdate }: EditMemberDialog
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email (Optional)</Label>
             <Input
               id="email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
             />
           </div>
 

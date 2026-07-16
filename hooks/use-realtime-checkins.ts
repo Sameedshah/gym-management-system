@@ -29,14 +29,6 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
   const [todayCount, setTodayCount] = useState(0)
   const [isConnected, setIsConnected] = useState(false)
 
-  const ensureMonthlyDues = async () => {
-    try {
-      await fetch('/api/invoices/generate-monthly-dues', { method: 'POST' })
-    } catch {
-      // silent — cron is the backup
-    }
-  }
-
   const fetchTodayCheckins = async () => {
     const supabase = createClient()
 
@@ -95,8 +87,9 @@ export function useRealtimeCheckins(): UseRealtimeCheckinsReturn {
   }
 
   useEffect(() => {
-    // Ensure this month's due invoices exist before fetching checkins
-    ensureMonthlyDues().then(() => fetchTodayCheckins())
+    // Initial fetch. Monthly dues generation runs on a Supabase pg_cron
+    // schedule, not from the client.
+    fetchTodayCheckins()
 
     // Poll every 2 minutes
     const pollInterval = setInterval(fetchTodayCheckins, POLL_INTERVAL_MS)

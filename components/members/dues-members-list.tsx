@@ -21,6 +21,7 @@ import { Loading } from "@/components/ui/loading"
 interface DuesMember extends Member {
   monthsDue: number
   lastReminderSent?: string
+  dueInvoices: { id: string; reminder_count: number }[]
 }
 
 export function DuesMembersList() {
@@ -46,7 +47,7 @@ export function DuesMembersList() {
       // Get all due invoices
       const { data: dueInvoices } = await supabase
         .from("invoices")
-        .select("id, member_id, months_due, last_reminder_sent")
+        .select("id, member_id, months_due, last_reminder_sent, reminder_count")
         .eq("status", "due")
 
       if (members && dueInvoices) {
@@ -64,7 +65,8 @@ export function DuesMembersList() {
             duesData.push({
               ...member,
               monthsDue: totalMonthsDue,
-              lastReminderSent: lastReminder?.last_reminder_sent
+              lastReminderSent: lastReminder?.last_reminder_sent,
+              dueInvoices: memberDues.map(inv => ({ id: inv.id, reminder_count: inv.reminder_count || 0 }))
             })
           }
         }
@@ -81,7 +83,7 @@ export function DuesMembersList() {
   const filteredMembers = duesMembers.filter(
     (member) =>
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (member.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.member_id?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -90,25 +92,32 @@ export function DuesMembersList() {
     
     try {
       const supabase = createClient()
-      
-      // Update all due invoices for this member
-      const { error } = await supabase
-        .from("invoices")
-        .update({
-          email_sent: true,
-          last_reminder_sent: new Date().toISOString(),
-          reminder_count: 1
-        })
-        .eq("member_id", member.id)
-        .eq("status", "due")
 
-      if (error) throw error
+      // Increment each due invoice's own reminder_count individually — a
+      // single bulk update can't apply a different value per row.
+      const sentAt = new Date().toISOString()
+      for (const inv of member.dueInvoices) {
+        const { error } = await supabase
+          .from("invoices")
+          .update({
+            email_sent: true,
+            last_reminder_sent: sentAt,
+            reminder_count: inv.reminder_count + 1,
+          })
+          .eq("id", inv.id)
+
+        if (error) throw error
+      }
 
       // Update local state
-      setDuesMembers(prev => 
-        prev.map(m => 
-          m.id === member.id 
-            ? { ...m, lastReminderSent: new Date().toISOString() }
+      setDuesMembers(prev =>
+        prev.map(m =>
+          m.id === member.id
+            ? {
+                ...m,
+                lastReminderSent: sentAt,
+                dueInvoices: m.dueInvoices.map(inv => ({ ...inv, reminder_count: inv.reminder_count + 1 })),
+              }
             : m
         )
       )

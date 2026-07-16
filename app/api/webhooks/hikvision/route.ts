@@ -6,7 +6,22 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     console.log('🔔 Hikvision webhook received')
-    
+
+    // If a secret is configured, require it via header or query param.
+    // Soft-enforced (only checked when set) so an already-deployed device
+    // isn't cut off the moment this code ships, before it's reconfigured.
+    const expectedSecret = process.env.HIKVISION_WEBHOOK_SECRET
+    if (expectedSecret) {
+      const providedSecret =
+        request.headers.get('x-webhook-secret') || request.nextUrl.searchParams.get('secret')
+      if (providedSecret !== expectedSecret) {
+        console.warn('❌ Hikvision webhook rejected: invalid or missing secret')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    } else {
+      console.warn('⚠️ HIKVISION_WEBHOOK_SECRET is not set — webhook is accepting unauthenticated requests')
+    }
+
     // Get the raw body for Hikvision events
     const body = await request.text()
     console.log('Webhook body:', body)
@@ -80,11 +95,12 @@ async function processAttendanceEvent(eventData: any) {
   
   console.log(`Processing attendance for employee: ${employeeNo} at ${eventTime}`)
   
-  // Find the member by member_id (which should match employeeNo)
+  // Find the member by biometric_id — the device-assigned enrollment ID,
+  // which is distinct from the human-facing 4-digit member_id.
   const { data: member, error: memberError } = await supabase
     .from('members')
     .select('id, name, member_id')
-    .eq('member_id', employeeNo)
+    .eq('biometric_id', employeeNo)
     .single()
   
   if (memberError || !member) {
@@ -92,24 +108,9 @@ async function processAttendanceEvent(eventData: any) {
     return { processed: false, reason: 'Member not found', employeeNo }
   }
   
-  // Check if this check-in already exists (prevent duplicates)
-  const checkTime = new Date(eventTime)
-  const timeWindow = new Date(checkTime.getTime() - 60000) // 1 minute window
-  
-  const { data: existingCheckin } = await supabase
-    .from('checkins')
-    .select('id')
-    .eq('member_id', member.id)
-    .gte('check_in_time', timeWindow.toISOString())
-    .lte('check_in_time', new Date(checkTime.getTime() + 60000).toISOString())
-    .single()
-  
-  if (existingCheckin) {
-    console.log(`Duplicate check-in prevented for ${member.name}`)
-    return { processed: false, reason: 'Duplicate check-in', member: member.name }
-  }
-  
-  // Insert the check-in record
+  // Duplicate check-ins are prevented at the DB level by the
+  // prevent_duplicate_checkin trigger (5-minute window, silently no-ops),
+  // so no app-level check is needed here.
   const { data: checkin, error: checkinError } = await supabase
     .from('checkins')
     .insert({
@@ -121,24 +122,25 @@ async function processAttendanceEvent(eventData: any) {
       notes: `Auto-synced from biometric device (${doorName})`
     })
     .select()
-    .single()
-  
+    .maybeSingle()
+
   if (checkinError) {
     console.error('Failed to insert check-in:', checkinError)
     return { processed: false, reason: 'Database error', error: checkinError.message }
   }
+
+  if (!checkin) {
+    console.log(`Duplicate check-in blocked by DB trigger for ${member.name}`)
+    return { processed: false, reason: 'Duplicate check-in', member: member.name }
+  }
   
   console.log(`✅ Check-in recorded for ${member.name}`)
-  
-  // Update member's last seen time and visit count
-  await supabase
-    .from('members')
-    .update({
-      last_seen: eventTime,
-      total_visits: member.total_visits ? member.total_visits + 1 : 1
-    })
-    .eq('id', member.id)
-  
+
+  // last_seen and total_visits are already updated atomically by the
+  // increment_member_visits DB trigger on checkins insert — doing it again
+  // here from a stale in-memory total_visits value would race with it and
+  // can undo a concurrent check-in's increment.
+
   return {
     processed: true,
     member: {

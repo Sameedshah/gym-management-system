@@ -3,7 +3,7 @@ export interface Member {
   member_id: string // 4-digit unique ID
   name: string
   father_name: string
-  email: string
+  email: string | null
   phone?: string
   membership_type: string // Will always be 'standard' now
   plan_name: "Strength Training" | "Cardio" | "Personal Training"

@@ -43,9 +43,13 @@ export function AddMemberDialog() {
     setError(null)
 
     const supabase = createClient()
-    
+
+    // email is nullable + UNIQUE in the DB — Postgres treats every NULL as
+    // distinct, so a genuinely blank email never collides with another
+    // member's blank email.
     const memberData = {
       ...formData,
+      email: formData.email.trim() || null,
       status: "active",
       join_date: new Date().toISOString().split("T")[0],
     }
@@ -63,31 +67,14 @@ export function AddMemberDialog() {
       return
     }
 
-    // Create initial due invoice for the first month
+    // Create initial due invoice for the first month.
+    // invoice_number is left unset — the DB trigger assigns a
+    // collision-safe number automatically.
     const today = new Date()
-    
-    // Generate concise invoice number
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    let invoiceNum = 1001
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) {
-        invoiceNum = parseInt(match[1]) + 1
-      }
-    }
-    
-    const invoiceNumber = `INV-${invoiceNum}`
     const invoiceMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
-    
+
     const invoiceData = {
       member_id: newMember.id,
-      invoice_number: invoiceNumber,
       invoice_month: invoiceMonth,
       status: "due",
       months_due: 1,

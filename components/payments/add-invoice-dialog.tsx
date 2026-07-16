@@ -53,32 +53,15 @@ export function AddInvoiceDialog() {
     setIsLoading(true)
 
     const supabase = createClient()
-    
-    // Generate concise invoice number (e.g., INV-1001, INV-1002)
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    let invoiceNum = 1001
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) {
-        invoiceNum = parseInt(match[1]) + 1
-      }
-    }
-    
-    const invoiceNumber = `INV-${invoiceNum}`
-    
-    // Get current month for invoice_month field
+
+    // Get current month for invoice_month field.
+    // invoice_number is left unset — the DB trigger assigns a
+    // collision-safe number automatically.
     const currentDate = new Date()
     const invoiceMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`
-    
+
     const { error } = await supabase.from("invoices").insert({
       member_id: formData.member_id,
-      invoice_number: invoiceNumber,
       invoice_month: invoiceMonth,
       months_due: parseInt(formData.months_due),
       amount: 0,

@@ -21,9 +21,8 @@ export default function PaymentsPage() {
     const supabase = createClient()
 
     try {
-      // Ensure this month's due invoices are generated before loading
-      await fetch('/api/invoices/generate-monthly-dues', { method: 'POST' }).catch(() => {})
-
+      // Monthly dues generation runs on a Supabase pg_cron schedule, not
+      // from the client.
       const { data } = await supabase
         .from("invoices")
         .select(`

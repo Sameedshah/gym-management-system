@@ -69,29 +69,43 @@ export function DeletePaymentDialog({
         throw deleteError
       }
 
-      // If this was a paid invoice, we might need to recreate due invoices
-      // This ensures data consistency for member dues tracking
+      // The deletion succeeded — sync the caller's list immediately so the
+      // UI can't show a row for an invoice that's already gone, regardless
+      // of what happens in the restore step below.
+      onDelete(invoice.id)
+
+      // If this was a paid invoice, recreate the due invoice it replaced so
+      // the member's payment obligation isn't silently lost.
+      // invoice_number is left unset — the DB trigger assigns it.
       if (invoice.status === "paid" && invoice.months_due) {
-        // Create a new due invoice to maintain the member's payment obligation
+        const today = new Date().toISOString().split('T')[0]
         const { error: recreateError } = await supabase
           .from("invoices")
           .insert({
             member_id: invoice.member_id,
+            invoice_month: invoice.invoice_month || `${today.slice(0, 7)}-01`,
             months_due: invoice.months_due,
+            amount: 0,
             status: "due",
             description: `Restored due after payment deletion: ${invoice.description || 'Monthly dues'}`,
-            due_date: new Date().toISOString().split('T')[0],
-            created_at: new Date().toISOString(),
+            due_date: today,
+            sms_sent: false,
+            email_sent: false,
+            reminder_count: 0,
           })
 
         if (recreateError) {
-          console.error("Warning: Failed to recreate due invoice:", recreateError)
-          // Don't throw here as the main deletion was successful
+          // The deletion (and the caller's list sync) already happened —
+          // a silent console.error here would mean the member's dues
+          // obligation is lost with no admin ever finding out.
+          setError(
+            `Payment deleted, but restoring the due invoice failed: ${recreateError.message}. ` +
+            `Please add a due invoice for this member manually.`
+          )
+          return
         }
       }
 
-      // Call the parent's onDelete callback
-      onDelete(invoice.id)
       onClose()
 
     } catch (error) {

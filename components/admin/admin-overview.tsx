@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Users, 
@@ -26,33 +25,10 @@ export function AdminOverview() {
   const [dailyPayments, setDailyPayments] = useState<any[]>([])
   const [monthlyPayments, setMonthlyPayments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [generatingDues, setGeneratingDues] = useState(false)
-  const [duesMessage, setDuesMessage] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAllData()
   }, [])
-
-  const generateMonthlyDues = async () => {
-    setGeneratingDues(true)
-    setDuesMessage(null)
-    try {
-      const res = await fetch('/api/invoices/generate-monthly-dues', { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        setDuesMessage(data.generated > 0
-          ? `Generated ${data.generated} due invoice(s) for this month.`
-          : 'All members already have invoices for this month.')
-        if (data.generated > 0) fetchAllData()
-      } else {
-        setDuesMessage(`Error: ${data.error}`)
-      }
-    } catch {
-      setDuesMessage('Failed to generate monthly dues.')
-    } finally {
-      setGeneratingDues(false)
-    }
-  }
 
   const fetchAllData = async () => {
     setLoading(true)
@@ -223,26 +199,13 @@ export function AdminOverview() {
                   <AlertTriangle className="h-5 w-5" />
                   Members with Outstanding Dues ({dueMembers.length})
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={generateMonthlyDues}
-                    disabled={generatingDues}
-                  >
-                    {generatingDues ? 'Generating...' : 'Generate Monthly Dues'}
-                  </Button>
-                  {dueMembers.length > 0 && (
-                    <EmailReminderButton
-                      dueMembers={dueMembers}
-                      onRemindersSent={fetchAllData}
-                    />
-                  )}
-                </div>
+                {dueMembers.length > 0 && (
+                  <EmailReminderButton
+                    dueMembers={dueMembers}
+                    onRemindersSent={fetchAllData}
+                  />
+                )}
               </div>
-              {duesMessage && (
-                <p className="text-sm text-muted-foreground mt-1">{duesMessage}</p>
-              )}
             </CardHeader>
             <CardContent>
               {dueMembers.length > 0 ? (
