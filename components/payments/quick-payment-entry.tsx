@@ -347,26 +347,36 @@ export function QuickPaymentEntry() {
         remainingMonthsToPay -= monthsToDeduct
       }
 
-      // Advance payment: more months paid than what was due, or no dues at all
+      // Advance payment: create one paid invoice per month so the cron won't
+      // re-generate "due" invoices for months that are already paid
       if (remainingMonthsToPay > 0) {
-        const advanceInvNumber = await getNextInvoiceNumber(supabase)
-        if (!receiptInvoiceNumber) receiptInvoiceNumber = advanceInvNumber
+        const advanceInvoices = []
+        for (let i = 0; i < remainingMonthsToPay; i++) {
+          const monthDate = new Date(currentDate)
+          monthDate.setMonth(monthDate.getMonth() + i)
+          const monthStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
 
-        const { error: advanceError } = await supabase.from("invoices").insert({
-          member_id: selectedMember.id,
-          invoice_number: advanceInvNumber,
-          invoice_month: invoiceMonth,
-          months_due: remainingMonthsToPay,
-          amount: amountAssigned ? 0 : amountPaid,
-          description: description || `Payment - ${remainingMonthsToPay} month(s) - Rs. ${amountPaid}`,
-          status: "paid",
-          paid_date: today,
-          due_date: today,
-          payment_method: "cash",
-          sms_sent: false,
-          email_sent: false,
-          reminder_count: 0,
-        })
+          const invNum = await getNextInvoiceNumber(supabase)
+          if (i === 0 && !receiptInvoiceNumber) receiptInvoiceNumber = invNum
+
+          advanceInvoices.push({
+            member_id: selectedMember.id,
+            invoice_number: invNum,
+            invoice_month: monthStr,
+            months_due: 1,
+            amount: i === 0 && !amountAssigned ? amountPaid : 0,
+            description: description || `Payment - ${monthStr}`,
+            status: "paid",
+            paid_date: today,
+            due_date: today,
+            payment_method: "cash",
+            sms_sent: false,
+            email_sent: false,
+            reminder_count: 0,
+          })
+        }
+
+        const { error: advanceError } = await supabase.from("invoices").insert(advanceInvoices)
         if (advanceError) throw advanceError
       }
 
