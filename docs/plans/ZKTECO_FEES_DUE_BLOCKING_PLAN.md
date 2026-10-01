@@ -1,7 +1,17 @@
 # Plan: Fees-Due Blocking on ZKTeco K40 + Instant Check-ins
 
-> Hand this whole file to Claude Code on the Windows gym laptop:
-> "Read `docs/plans/ZKTECO_FEES_DUE_BLOCKING_PLAN.md` and work as per the plan."
+> **Two machines, linked through GitHub** (`Sameedshah/gym-management-system`, branches `main` + `master` kept identical):
+>
+> | Machine | Has | Does |
+> |---|---|---|
+> | **Windows gym laptop** | The running biometric listener + the K40 on LAN | Phases 0–3: device side, listener, SQL migration. Then writes the handoff note |
+> | **Linux dev PC** | The full Next.js project | Phase 4: web UI (override control, soft alert), build and deploy |
+>
+> **Laptop setup (one time):** the laptop has only the listener, not the web project. Clone the repo next to it, e.g.
+> `git clone https://github.com/Sameedshah/gym-management-system.git C:\gym-management-system`.
+> No `npm install` or build of the Next.js app is needed on the laptop; the clone is only for this plan, the SQL migration and versioning the listener.
+> Then open Claude Code in that folder and say:
+> "Read `docs/plans/ZKTECO_FEES_DUE_BLOCKING_PLAN.md` and work as per the plan. You are on the Windows laptop: do Phases 0–3 and the handoff."
 
 ---
 
@@ -61,7 +71,8 @@
 - Secrets (Supabase service role key, device IP/comm key) stay in the listener's `.env`. Never commit them. Never print them in logs.
 - The listener must keep running as it does today (same start method, e.g. Windows Service / pm2 / startup script). Don't break the existing check-in push while adding features. Keep the current behavior working at every step.
 - Match existing code style in the repo (TypeScript, Supabase client from `lib/supabase/*`, shadcn/ui components).
-- Commit the listener into this repo under `zkteco-listener/` (without `.env`, `node_modules`, backups or state files) so it is version-controlled from now on.
+- Copy the listener into the cloned repo under `zkteco-listener/` (without `.env`, `node_modules`, backups or state files) so it is version-controlled from now on. **Keep the currently running listener untouched** until the new version passes Verification. Only then, with the user's approval, switch the service/startup entry to run from `zkteco-listener/`, copying its `.env` across. Keep the old folder as a rollback.
+- **On the laptop, do not modify the Next.js app code** (`app/`, `components/`, `hooks/`, `lib/`, `middleware.ts`). It can't be built or tested there; that work belongs to the Linux dev PC (Phase 4).
 
 ## Authority
 
@@ -70,15 +81,15 @@
 - Copy the existing listener script into `zkteco-listener/` and refactor it.
 - Install npm packages in the listener folder.
 - Create a **test user** on the K40 (ID `9999`, name `TEST BLOCK`), and disable/enable/delete **only that test user**, to verify firmware capability.
-- Write new SQL migration files in `scripts/`, and Next.js code (UI toggle, alert component, API routes).
-- Create commits on a feature branch `feat/zk-fees-due-blocking`.
+- Write new SQL migration files in `scripts/`, and docs in `docs/plans/`.
+- Create local commits on `main`.
 
 **You MUST ask the user first:**
 - The open decisions in Context (blocking rule, mode, firmware) before Phase 2.
 - Running any SQL migration against the **live** Supabase DB. Show the SQL, then run it after approval (or let the user run it in the Supabase SQL editor).
 - The first time hard-blocking is enabled against **real** members. Start with a dry-run mode that only logs "would disable 1023", and get approval after showing the dry-run list.
 - Restarting or reinstalling the running listener service.
-- Pushing to GitHub or merging to `main`.
+- Pushing to GitHub. When approved, push the same commit to **both** `main` and `master` (`git push origin main` and `git push origin main:master`). Pull first, since the Linux PC also pushes.
 
 **You MUST NOT:**
 - Delete or overwrite device users/fingerprints/logs (see Constraints).
@@ -109,11 +120,18 @@
 - Auto-reconnect to the device and to Supabase. Logs written to a rotating file.
 - `README.md`: setup, `.env.example`, how to run and install as a service, how blocking works, how to roll back (set `ACCESS_SYNC_ENABLED=false` and run `tools/enable-all.js`, which re-enables every non-admin user).
 
-**Phase 4 – Web app (this Next.js repo):**
+**Handoff (laptop, last step):** `docs/plans/ZKTECO_HANDOFF.md`, committed and pushed. The Linux PC session starts from this file, so it must contain:
+- The user's answers: the blocking rule, the mode (hard/soft/both) and the K40 firmware version
+- Which blocking method works on this firmware (from Phase 1)
+- Migration status: whether `scripts/005_device_access.sql` has been run on the live DB, and the exact column and view/RPC names and shapes
+- Listener status: where it runs from, whether access sync is live or in dry-run, and the log location
+- Verification results so far, and anything left open for the web side
+
+**Phase 4 – Web app. Done on the Linux dev PC, NOT on the laptop.** Start by reading `docs/plans/ZKTECO_HANDOFF.md`:
 - Member detail/edit: an **"Allow entry until…"** control writing `entry_override_until`, plus a "Blocked on device" badge.
 - If the mode includes soft alert: in `components/dashboard/recent-checkins.tsx`, when a realtime check-in arrives for a member with `months_due > 0`, show a red full-screen overlay (name, Member ID, months due, amount) with a loud sound. Auto-dismiss after ~8 s or on click. Use the existing `useRealtimeCheckins` hook and don't add extra polling.
 
-**Final report to the user:** what changed, how to switch blocking on/off, how to override a member, and how to roll back.
+**Final report to the user (each machine reports its own part):** what changed, how to switch blocking on/off, how to override a member, and how to roll back.
 
 ## Verification
 
@@ -124,10 +142,10 @@ Do every step physically with the user at the device, and report the result of e
 3. **Dry run:** with `ACCESS_SYNC_DRY_RUN=true`, the log lists exactly the members the agreed rule should block. Cross-check 3 of them against the Payments page. The user approves the list.
 4. **Hard block live** (on one consenting/test member first): create a due invoice that matches the rule → within ~30 s the log shows `DISABLED`. Scanning gives the error beep, with no "Thank you".
 5. **Payment unblocks:** mark the invoice paid in the web app → within ~30 s the log shows `ENABLED`. The same finger is accepted without re-enrolling.
-6. **Override:** set "Allow entry until tomorrow" on a blocked member → enabled within ~30 s. After the date passes (or the override is cleared), they're blocked again.
+6. **Override** (after Phase 4 is deployed from the Linux PC): set "Allow entry until tomorrow" on a blocked member → enabled within ~30 s. After the date passes (or the override is cleared), they're blocked again.
 7. **Fail-open:** disconnect the laptop Wi-Fi for 2 minutes → no device users change state, the device keeps working offline, and check-ins buffered on the device appear on the dashboard after reconnect.
 8. **Device unplugged:** pull the LAN cable for 1 minute → the listener logs the reconnect attempts and recovers by itself. No crash, no duplicate check-ins.
 9. **Admin safety:** device admin accounts are untouched (compare with the backup JSON).
 10. **Restart persistence:** reboot the laptop → the listener starts by itself, and the access sync and realtime check-ins work again.
-11. **Soft alert** (if chosen): a member with dues scans → the red overlay and sound appear on the dashboard within ~3 s.
-12. `npm run build` passes for the Next.js app. The listener runs with no errors for 30 minutes of normal use.
+11. **Soft alert** (if chosen, after Phase 4 is deployed): a member with dues scans → the red overlay and sound appear on the dashboard within ~3 s.
+12. The listener runs with no errors for 30 minutes of normal use (laptop). `npm run build` passes for the Next.js app (Linux PC, Phase 4).
